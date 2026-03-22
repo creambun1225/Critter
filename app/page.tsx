@@ -1,13 +1,34 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+} from "firebase/firestore";
 
 export default function Home() {
   const [text, setText] = useState("");
-  const [posts, setPosts] = useState<string[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
 
-  const handlePost = () => {
+  // 🔥 投稿取得
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "posts"), (snapshot) => {
+      const data = snapshot.docs.map((doc) => doc.data());
+      setPosts(data);
+    });
+    return () => unsub();
+  }, []);
+
+  // 🔥 投稿
+  const handlePost = async () => {
     if (!text) return;
-    setPosts([text, ...posts]);
+
+    await addDoc(collection(db, "posts"), {
+      text,
+    });
+
     setText("");
   };
 
@@ -32,7 +53,7 @@ export default function Home() {
         <div className="mt-4">
           {posts.map((post, i) => (
             <div key={i} className="border p-2 mb-2">
-              {post}
+              {post.text}
             </div>
           ))}
         </div>
