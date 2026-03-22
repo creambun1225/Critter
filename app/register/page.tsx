@@ -3,49 +3,88 @@
 import { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import Link from "next/link";
 
 export default function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [gender, setGender] = useState("その他");
 
   const handleRegister = async () => {
+    if (!username || !password) {
+      alert("ユーザー名とパスワードは必須！");
+      return;
+    }
+
     try {
       await createUserWithEmailAndPassword(
         auth,
         username + "@critter.com",
         password
       );
+
       alert("登録成功！");
+      window.location.href = "/";
     } catch (e) {
-      alert("登録失敗");
+      alert("登録失敗（ユーザー名かパスワード確認して）");
     }
   };
 
   return (
-    <div className="flex justify-center items-center h-screen">
-      <div className="w-[400px] p-6 border rounded">
-        <h1 className="text-xl font-bold mb-4">アカウント作成</h1>
+    <main className="flex justify-center items-center min-h-screen bg-gray-100">
+      <div className="w-[400px] bg-white p-6 rounded-xl shadow">
+        
+        {/* ロゴ */}
+        <div className="flex justify-center mb-4">
+          <div className="w-12 h-12 bg-blue-500 rounded-full"></div>
+        </div>
 
+        {/* タイトル */}
+        <h1 className="text-2xl font-bold text-center mb-2">
+          Karotterに参加しよう
+        </h1>
+
+        <p className="text-center text-sm text-gray-500 mb-4">
+          または{" "}
+          <Link href="/login" className="text-blue-500">
+            既存のアカウントでログイン
+          </Link>
+        </p>
+
+        {/* ユーザー名 */}
         <input
           placeholder="ユーザー名"
-          className="w-full border p-2 mb-2"
+          className="w-full border p-3 rounded mb-3"
           onChange={(e) => setUsername(e.target.value)}
         />
 
+        {/* 性別 */}
+        <select
+          className="w-full border p-3 rounded mb-3"
+          value={gender}
+          onChange={(e) => setGender(e.target.value)}
+        >
+          <option>男性</option>
+          <option>女性</option>
+          <option>その他</option>
+        </select>
+
+        {/* パスワード */}
         <input
           type="password"
           placeholder="パスワード"
-          className="w-full border p-2 mb-2"
+          className="w-full border p-3 rounded mb-3"
           onChange={(e) => setPassword(e.target.value)}
         />
 
+        {/* 登録ボタン */}
         <button
           onClick={handleRegister}
-          className="bg-black text-white w-full py-2 rounded"
+          className="w-full bg-black text-white py-3 rounded font-bold"
         >
-          登録
+          アカウント作成
         </button>
       </div>
-    </div>
+    </main>
   );
 }
