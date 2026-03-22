@@ -9,10 +9,18 @@ export default function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [gender, setGender] = useState("その他");
+  const [error, setError] = useState("");
 
   const handleRegister = async () => {
+    setError("");
+
     if (!username || !password) {
-      alert("ユーザー名とパスワード必須！");
+      setError("ユーザー名とパスワードは必須！");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("パスワードは6文字以上にして！");
       return;
     }
 
@@ -25,8 +33,8 @@ export default function Register() {
 
       alert("登録成功！");
       window.location.href = "/";
-    } catch (e) {
-      alert("登録失敗");
+    } catch (e: any) {
+      setError(e.message);
     }
   };
 
@@ -50,12 +58,22 @@ export default function Register() {
           </Link>
         </p>
 
+        {/* エラー表示 */}
+        {error && (
+          <p className="text-red-500 text-sm mb-2 text-center">
+            {error}
+          </p>
+        )}
+
+        {/* ユーザー名 */}
         <input
           placeholder="ユーザー名"
           className="w-full border p-3 rounded mb-3"
+          value={username}
           onChange={(e) => setUsername(e.target.value)}
         />
 
+        {/* 性別 */}
         <select
           className="w-full border p-3 rounded mb-3"
           value={gender}
@@ -66,13 +84,16 @@ export default function Register() {
           <option>その他</option>
         </select>
 
+        {/* パスワード */}
         <input
           type="password"
-          placeholder="パスワード"
+          placeholder="パスワード（6文字以上）"
           className="w-full border p-3 rounded mb-3"
+          value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
+        {/* 登録ボタン */}
         <button
           onClick={handleRegister}
           className="w-full bg-black text-white py-3 rounded font-bold"
