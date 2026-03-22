@@ -12,7 +12,7 @@ export default function Register() {
 
   const handleRegister = async () => {
     if (!username || !password) {
-      alert("ユーザー名とパスワードは必須！");
+      alert("ユーザー名とパスワード必須！");
       return;
     }
 
@@ -26,7 +26,7 @@ export default function Register() {
       alert("登録成功！");
       window.location.href = "/";
     } catch (e) {
-      alert("登録失敗（ユーザー名かパスワード確認して）");
+      alert("登録失敗");
     }
   };
 
@@ -39,26 +39,23 @@ export default function Register() {
           <div className="w-12 h-12 bg-blue-500 rounded-full"></div>
         </div>
 
-        {/* タイトル */}
         <h1 className="text-2xl font-bold text-center mb-2">
-          Karotterに参加しよう
+          アカウント作成
         </h1>
 
         <p className="text-center text-sm text-gray-500 mb-4">
           または{" "}
           <Link href="/login" className="text-blue-500">
-            既存のアカウントでログイン
+            ログインはこちら
           </Link>
         </p>
 
-        {/* ユーザー名 */}
         <input
           placeholder="ユーザー名"
           className="w-full border p-3 rounded mb-3"
           onChange={(e) => setUsername(e.target.value)}
         />
 
-        {/* 性別 */}
         <select
           className="w-full border p-3 rounded mb-3"
           value={gender}
@@ -69,7 +66,6 @@ export default function Register() {
           <option>その他</option>
         </select>
 
-        {/* パスワード */}
         <input
           type="password"
           placeholder="パスワード"
@@ -77,7 +73,6 @@ export default function Register() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        {/* 登録ボタン */}
         <button
           onClick={handleRegister}
           className="w-full bg-black text-white py-3 rounded font-bold"
