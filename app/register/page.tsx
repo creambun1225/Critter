@@ -1,30 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
-export default function Login() {
+export default function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = async () => {
+  const handleRegister = async () => {
     try {
-      await signInWithEmailAndPassword(
+      await createUserWithEmailAndPassword(
         auth,
         username + "@critter.com",
         password
       );
-      alert("ログイン成功！");
+      alert("登録成功！");
     } catch (e) {
-      alert("ログイン失敗");
+      alert("登録失敗");
     }
   };
 
   return (
     <div className="flex justify-center items-center h-screen">
       <div className="w-[400px] p-6 border rounded">
-        <h1 className="text-xl font-bold mb-4">ログイン</h1>
+        <h1 className="text-xl font-bold mb-4">アカウント作成</h1>
 
         <input
           placeholder="ユーザー名"
@@ -40,10 +40,10 @@ export default function Login() {
         />
 
         <button
-          onClick={handleLogin}
-          className="bg-blue-500 text-white w-full py-2 rounded"
+          onClick={handleRegister}
+          className="bg-black text-white w-full py-2 rounded"
         >
-          ログイン
+          登録
         </button>
       </div>
     </div>
