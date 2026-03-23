@@ -5,6 +5,13 @@ import { db, auth } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "firebase/storage";
+
 export default function EditProfile(){
 
   const [user,setUser]=useState<any>(null);
@@ -12,10 +19,12 @@ export default function EditProfile(){
 
   const [username,setUsername]=useState("");
   const [bio,setBio]=useState("");
-  const [icon,setIcon]=useState("");
-  const [header,setHeader]=useState("");
 
-  // 🔥 正しいログインチェック
+  const [iconFile,setIconFile]=useState<any>(null);
+  const [headerFile,setHeaderFile]=useState<any>(null);
+
+  const storage = getStorage();
+
   useEffect(()=>{
     return onAuthStateChanged(auth,(u)=>{
       if(!u){
@@ -23,15 +32,12 @@ export default function EditProfile(){
       }else{
         setUser(u);
 
-        // データ取得
         getDoc(doc(db,"users",u.uid)).then(d=>{
           const data:any=d.data();
           if(!data) return;
 
           setUsername(data.username || "");
           setBio(data.bio || "");
-          setIcon(data.icon || "");
-          setHeader(data.header || "");
         });
 
         setLoading(false);
@@ -39,15 +45,32 @@ export default function EditProfile(){
     });
   },[]);
 
+  const uploadImage = async (file:any,path:string)=>{
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+  };
+
   const save = async ()=>{
     if(!user) return;
+
+    let iconUrl = "";
+    let headerUrl = "";
+
+    if(iconFile){
+      iconUrl = await uploadImage(iconFile, "icons/"+user.uid);
+    }
+
+    if(headerFile){
+      headerUrl = await uploadImage(headerFile, "headers/"+user.uid);
+    }
 
     await setDoc(doc(db,"users",user.uid),{
       username,
       bio,
-      icon,
-      header
-    });
+      icon: iconUrl,
+      header: headerUrl
+    },{ merge:true });
 
     alert("保存完了");
     window.location.href="/profile";
@@ -74,18 +97,18 @@ export default function EditProfile(){
         onChange={(e)=>setBio(e.target.value)}
       />
 
-      <p>アイコンURL</p>
+      <p>アイコン画像</p>
       <input
-        className="border w-full p-2 mb-3"
-        value={icon}
-        onChange={(e)=>setIcon(e.target.value)}
+        type="file"
+        onChange={(e)=>setIconFile(e.target.files?.[0])}
+        className="mb-3"
       />
 
-      <p>ヘッダーURL</p>
+      <p>ヘッダー画像</p>
       <input
-        className="border w-full p-2 mb-3"
-        value={header}
-        onChange={(e)=>setHeader(e.target.value)}
+        type="file"
+        onChange={(e)=>setHeaderFile(e.target.files?.[0])}
+        className="mb-3"
       />
 
       <button
