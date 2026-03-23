@@ -1,39 +1,45 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db, auth } from "@/lib/firebase";
-import { doc, getDoc, addDoc, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
 import { useParams } from "next/navigation";
 
 export default function UserProfile() {
-  const { uid } = useParams();
-  const [data, setData] = useState<any>({});
+  const params = useParams();
+  const uid = params?.uid as string;
+
+  const [data, setData] = useState<any>(null);
+  const [posts, setPosts] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!uid) return;
+
     const load = async () => {
-      const d = await getDoc(doc(db, "users", uid as string));
-      setData(d.data());
+      const d = await getDoc(doc(db, "users", uid));
+      if (d.exists()) setData(d.data());
     };
+
     load();
-  }, []);
+
+    const q = query(collection(db, "posts"), where("uid", "==", uid));
+    const unsub = onSnapshot(q, (snap) => {
+      setPosts(snap.docs.map(d => d.data()));
+    });
+
+    return () => unsub();
+  }, [uid]);
+
+  if (!data) return <div className="p-4">読み込み中...</div>;
 
   return (
     <div className="p-4">
-
       <h1>{data.username}</h1>
       <p>{data.bio}</p>
 
-      <button
-        onClick={async () => {
-          await addDoc(collection(db, "follows"), {
-            to: uid,
-          });
-        }}
-        className="border px-3 py-1"
-      >
-        フォロー
-      </button>
-
+      {posts.map((p,i)=>(
+        <div key={i} className="border p-2">{p.text}</div>
+      ))}
     </div>
   );
 }
