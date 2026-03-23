@@ -3,31 +3,40 @@
 import { useEffect, useState } from "react";
 import { db, auth } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function EditProfile(){
 
   const [user,setUser]=useState<any>(null);
+  const [loading,setLoading]=useState(true);
+
   const [username,setUsername]=useState("");
   const [bio,setBio]=useState("");
   const [icon,setIcon]=useState("");
   const [header,setHeader]=useState("");
 
+  // 🔥 正しいログインチェック
   useEffect(()=>{
-    const u = auth.currentUser;
-    if(!u) window.location.href="/login";
-    else {
-      setUser(u);
+    return onAuthStateChanged(auth,(u)=>{
+      if(!u){
+        window.location.href="/login";
+      }else{
+        setUser(u);
 
-      getDoc(doc(db,"users",u.uid)).then(d=>{
-        const data:any=d.data();
-        if(!data) return;
+        // データ取得
+        getDoc(doc(db,"users",u.uid)).then(d=>{
+          const data:any=d.data();
+          if(!data) return;
 
-        setUsername(data.username || "");
-        setBio(data.bio || "");
-        setIcon(data.icon || "");
-        setHeader(data.header || "");
-      });
-    }
+          setUsername(data.username || "");
+          setBio(data.bio || "");
+          setIcon(data.icon || "");
+          setHeader(data.header || "");
+        });
+
+        setLoading(false);
+      }
+    });
   },[]);
 
   const save = async ()=>{
@@ -43,6 +52,8 @@ export default function EditProfile(){
     alert("保存完了");
     window.location.href="/profile";
   };
+
+  if(loading) return <div>読み込み中...</div>;
 
   return (
     <div className="bg-white min-h-screen p-6">
