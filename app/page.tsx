@@ -22,10 +22,10 @@ export default function Home() {
   const [likes, setLikes] = useState<any[]>([]);
   const [replies, setReplies] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
-  const [userData, setUserData] = useState<any>(null);
+  const [username, setUsername] = useState("");
   const [replyText, setReplyText] = useState<any>({});
 
-  // ログイン＆ユーザー情報
+  // 🔥 ログイン＆ユーザー名取得（修正ポイント）
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
@@ -36,13 +36,15 @@ export default function Home() {
       setUser(u);
 
       const docRef = await getDoc(doc(db, "users", u.uid));
-      setUserData(docRef.data());
+      const data = docRef.data();
+
+      setUsername(data?.username || "ユーザー");
     });
 
     return () => unsub();
   }, []);
 
-  // 投稿
+  // 投稿取得
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     return onSnapshot(q, (snap) => {
@@ -64,15 +66,15 @@ export default function Home() {
     });
   }, []);
 
-  // 投稿処理
+  // 📝 投稿
   const handlePost = async () => {
-    if (!text || !user || !userData) return;
+    if (!text || !user) return;
 
     await addDoc(collection(db, "posts"), {
       text,
       createdAt: Date.now(),
       uid: user.uid,
-      username: userData.username || "ユーザー",
+      username: username, // 🔥 これ重要
     });
 
     setText("");
@@ -104,6 +106,7 @@ export default function Home() {
       text: replyText[postId],
       postId,
       uid: user.uid,
+      username: username, // 🔥 これ追加
       createdAt: Date.now(),
     });
 
@@ -174,7 +177,7 @@ export default function Home() {
                 .filter(r => r.postId === post.id)
                 .map((r, i) => (
                   <p key={i} className="text-sm">
-                    {r.uid}: {r.text}
+                    {r.username}: {r.text}
                   </p>
                 ))}
             </div>
