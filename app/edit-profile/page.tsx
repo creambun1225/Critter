@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { db, auth, storage } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function EditProfile(){
 
@@ -15,15 +14,12 @@ export default function EditProfile(){
   const [username,setUsername]=useState("");
   const [bio,setBio]=useState("");
 
-  const [iconFile,setIconFile]=useState<File | null>(null);
-  const [headerFile,setHeaderFile]=useState<File | null>(null);
-
-  const [iconUrl,setIconUrl]=useState("");
-  const [headerUrl,setHeaderUrl]=useState("");
+  const [icon,setIcon]=useState("");
+  const [header,setHeader]=useState("");
 
   const [trends,setTrends]=useState<string[]>([]);
 
-  // 🔐 ログイン
+  // 🔐 ログインチェック
   useEffect(()=>{
     return onAuthStateChanged(auth,(u)=>{
       if(!u){
@@ -37,8 +33,8 @@ export default function EditProfile(){
 
           setUsername(data.username || "");
           setBio(data.bio || "");
-          setIconUrl(data.icon || "");
-          setHeaderUrl(data.header || "");
+          setIcon(data.icon || "");
+          setHeader(data.header || "");
         });
 
         setLoading(false);
@@ -51,52 +47,25 @@ export default function EditProfile(){
     setTrends(["AI","ゲーム","マイクラ","YouTube","学校"]);
   },[]);
 
-  // 画像アップロード（失敗しても止まらない）
-  const uploadImageSafe = async (file:File,path:string)=>{
-    try{
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      return await getDownloadURL(storageRef);
-    }catch(e){
-      console.error("画像アップロード失敗:", e);
-      return null; // ← 失敗してもOK
-    }
-  };
-
-  // 💾 保存（最強安定版）
+  // 💾 保存
   const save = async ()=>{
     if(!user) return;
 
-    let newIcon = iconUrl;
-    let newHeader = headerUrl;
+    try{
+      await setDoc(doc(db,"users",user.uid),{
+        username,
+        bio,
+        icon,
+        header
+      },{merge:true});
 
-    console.log("🔥 保存開始");
+      alert("保存成功！");
+      window.location.href="/profile";
 
-    // アイコン
-    if(iconFile){
-      console.log("📷 アイコンアップロード");
-      const result = await uploadImageSafe(iconFile, "icons/"+user.uid);
-      if(result) newIcon = result;
+    }catch(e){
+      console.error(e);
+      alert("保存失敗");
     }
-
-    // ヘッダー
-    if(headerFile){
-      console.log("🖼 ヘッダーアップロード");
-      const result = await uploadImageSafe(headerFile, "headers/"+user.uid);
-      if(result) newHeader = result;
-    }
-
-    // Firestore保存（必ず通る）
-    await setDoc(doc(db,"users",user.uid),{
-      username,
-      bio,
-      icon:newIcon,
-      header:newHeader
-    },{merge:true});
-
-    console.log("✅ 保存完了");
-    alert("保存成功！");
-    window.location.href="/profile";
   };
 
   if(loading) return <div>読み込み中...</div>;
@@ -147,20 +116,18 @@ export default function EditProfile(){
           onChange={(e)=>setBio(e.target.value)}
         />
 
-        <p>アイコン画像</p>
+        <p>アイコンURL</p>
         <input
-          type="file"
-          accept="image/*"
-          onChange={(e)=>setIconFile(e.target.files?.[0] || null)}
-          className="mb-3"
+          className="border w-full p-2 mb-3"
+          value={icon}
+          onChange={(e)=>setIcon(e.target.value)}
         />
 
-        <p>ヘッダー画像</p>
+        <p>ヘッダーURL</p>
         <input
-          type="file"
-          accept="image/*"
-          onChange={(e)=>setHeaderFile(e.target.files?.[0] || null)}
-          className="mb-3"
+          className="border w-full p-2 mb-3"
+          value={header}
+          onChange={(e)=>setHeader(e.target.value)}
         />
 
         <button
