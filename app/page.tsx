@@ -14,7 +14,7 @@ import {
   setDoc,
   deleteDoc
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 export default function Home() {
   const [posts, setPosts] = useState<any[]>([]);
@@ -24,7 +24,17 @@ export default function Home() {
   const [bookmarks, setBookmarks] = useState<any>({});
   const [trends, setTrends] = useState<string[]>([]);
 
-  // ログイン
+  // 🔥 右クリックで設定
+  useEffect(() => {
+    const handler = (e:any) => {
+      e.preventDefault();
+      window.location.href = "/settings";
+    };
+    window.addEventListener("contextmenu", handler);
+    return () => window.removeEventListener("contextmenu", handler);
+  }, []);
+
+  // ログインチェック
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       if (!u) window.location.href = "/login";
@@ -86,7 +96,7 @@ export default function Home() {
     };
   }, [user]);
 
-  // 🔥トレンド（単語＋#）
+  // 🔥トレンド
   useEffect(() => {
     const words:any = {};
 
@@ -113,15 +123,27 @@ export default function Home() {
     <main className="flex justify-center bg-[#f5f8fa] min-h-screen">
 
       {/* 左メニュー */}
-      <div className="w-[250px] p-6 space-y-6 border-r">
+      <div className="w-[250px] p-6 border-r flex flex-col justify-between">
 
-        <h1 className="text-3xl font-bold text-blue-500">Critter</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-blue-500 mb-8">Critter</h1>
 
-        <div className="space-y-5 text-xl font-medium">
-          <Link href="/" className="block hover:text-blue-500">🏠 ホーム</Link>
-          <Link href="/notifications" className="block hover:text-blue-500">🔔 通知</Link>
-          <Link href="/profile" className="block hover:text-blue-500">👤 プロフィール</Link>
-          <Link href="/bookmarks" className="block hover:text-blue-500">🔖 ブックマーク</Link>
+          <div className="flex flex-col gap-7 text-xl font-medium">
+            <Link href="/">🏠 ホーム</Link>
+            <Link href="/notifications">🔔 通知</Link>
+            <Link href="/profile">👤 プロフィール</Link>
+            <Link href="/bookmarks">🔖 ブックマーク</Link>
+            <Link href="/settings">⚙️ 設定</Link>
+          </div>
+
+          {/* 🔥 ログアウト */}
+          <button
+            onClick={() => signOut(auth)}
+            className="mt-10 text-red-500 text-lg"
+          >
+            ログアウト
+          </button>
+
         </div>
 
         <button
@@ -136,7 +158,7 @@ export default function Home() {
               username:userData?.username || "unknown"
             });
           }}
-          className="bg-blue-500 text-white w-full py-3 rounded-full font-bold"
+          className="bg-blue-500 text-white py-3 rounded-full"
         >
           ＋ クリート
         </button>
@@ -149,19 +171,16 @@ export default function Home() {
         {posts.map(p => (
           <div key={p.id} className="p-4 border-b hover:bg-gray-50">
 
-            {/* 名前 */}
             <Link href={`/user/${p.uid}`}>
-              <p className="font-bold text-sm hover:underline cursor-pointer">
+              <p className="font-bold text-sm hover:underline">
                 {p.username}
               </p>
             </Link>
 
-            {/* 本文 */}
             <Link href={`/post/${p.id}`}>
-              <p className="mt-1 text-[15px] cursor-pointer">{p.text}</p>
+              <p className="mt-1 text-[15px]">{p.text}</p>
             </Link>
 
-            {/* アクション */}
             <div className="flex justify-between mt-3 text-sm text-gray-500">
 
               <button onClick={()=>toggleLike(p.id)}>
@@ -189,10 +208,7 @@ export default function Home() {
       <div className="w-[250px] p-4">
         <div className="bg-white p-4 rounded-xl">
           <h2 className="font-bold mb-2">🔥 トレンド</h2>
-
-          {trends.map((t,i)=>(
-            <p key={i} className="py-1">{t}</p>
-          ))}
+          {trends.map((t,i)=><p key={i}>{t}</p>)}
         </div>
       </div>
 
