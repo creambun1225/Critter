@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { db, auth } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
 export default function Profile() {
   const [data, setData] = useState<any>({});
+  const [posts, setPosts] = useState<any[]>([]);
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -14,6 +15,11 @@ export default function Profile() {
 
       const d = await getDoc(doc(db, "users", u.uid));
       setData(d.data());
+
+      const q = query(collection(db, "posts"), where("uid", "==", u.uid));
+      onSnapshot(q, snap => {
+        setPosts(snap.docs.map(d => d.data()));
+      });
     });
   }, []);
 
@@ -34,9 +40,15 @@ export default function Profile() {
 
       <div className="p-4">
         <h1 className="text-2xl font-bold">{data.username}</h1>
-        <p className="text-gray-500">@{data.username}</p>
+        <p>@{data.username}</p>
         <p>{data.bio}</p>
       </div>
+
+      {posts.map((p,i)=>(
+        <div key={i} className="border p-3">
+          {p.text}
+        </div>
+      ))}
 
     </div>
   );
