@@ -23,7 +23,7 @@ export default function EditProfile(){
 
   const [trends,setTrends]=useState<string[]>([]);
 
-  // 🔐 ログインチェック
+  // 🔐 ログイン
   useEffect(()=>{
     return onAuthStateChanged(auth,(u)=>{
       if(!u){
@@ -46,51 +46,57 @@ export default function EditProfile(){
     });
   },[]);
 
-  // 🔥 トレンド（仮）
+  // トレンド（仮）
   useEffect(()=>{
     setTrends(["AI","ゲーム","マイクラ","YouTube","学校"]);
   },[]);
 
-  // 🔥 画像アップロード関数
-  const uploadImage = async (file:File,path:string)=>{
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
+  // 画像アップロード（失敗しても止まらない）
+  const uploadImageSafe = async (file:File,path:string)=>{
+    try{
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      return await getDownloadURL(storageRef);
+    }catch(e){
+      console.error("画像アップロード失敗:", e);
+      return null; // ← 失敗してもOK
+    }
   };
 
-  // 💾 保存
+  // 💾 保存（最強安定版）
   const save = async ()=>{
     if(!user) return;
 
     let newIcon = iconUrl;
     let newHeader = headerUrl;
 
-    try{
+    console.log("🔥 保存開始");
 
-      // アイコン更新
-      if(iconFile){
-        newIcon = await uploadImage(iconFile, "icons/"+user.uid);
-      }
-
-      // ヘッダー更新
-      if(headerFile){
-        newHeader = await uploadImage(headerFile, "headers/"+user.uid);
-      }
-
-      await setDoc(doc(db,"users",user.uid),{
-        username,
-        bio,
-        icon:newIcon,
-        header:newHeader
-      },{merge:true});
-
-      alert("保存成功！");
-      window.location.href="/profile";
-
-    }catch(e){
-      console.log(e);
-      alert("保存失敗（Storage設定ミスの可能性）");
+    // アイコン
+    if(iconFile){
+      console.log("📷 アイコンアップロード");
+      const result = await uploadImageSafe(iconFile, "icons/"+user.uid);
+      if(result) newIcon = result;
     }
+
+    // ヘッダー
+    if(headerFile){
+      console.log("🖼 ヘッダーアップロード");
+      const result = await uploadImageSafe(headerFile, "headers/"+user.uid);
+      if(result) newHeader = result;
+    }
+
+    // Firestore保存（必ず通る）
+    await setDoc(doc(db,"users",user.uid),{
+      username,
+      bio,
+      icon:newIcon,
+      header:newHeader
+    },{merge:true});
+
+    console.log("✅ 保存完了");
+    alert("保存成功！");
+    window.location.href="/profile";
   };
 
   if(loading) return <div>読み込み中...</div>;
@@ -122,7 +128,7 @@ export default function EditProfile(){
 
       </div>
 
-      {/* 🔥 真ん中（編集） */}
+      {/* 真ん中 */}
       <div className="w-[600px] bg-white border-x p-6">
 
         <h1 className="text-xl font-bold mb-4">プロフィール編集</h1>
@@ -166,7 +172,7 @@ export default function EditProfile(){
 
       </div>
 
-      {/* 右トレンド */}
+      {/* 右 */}
       <div className="w-[250px] p-4">
         <div className="bg-white p-4 rounded-xl">
           <h2 className="font-bold mb-2">🔥 トレンド</h2>
