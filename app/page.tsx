@@ -9,42 +9,22 @@ import {
   query,
   orderBy,
   onSnapshot,
-  doc,
-  setDoc,
-  deleteDoc,
-  getDoc
 } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function Home() {
   const [text, setText] = useState("");
   const [posts, setPosts] = useState<any[]>([]);
-  const [likes, setLikes] = useState<any[]>([]);
-  const [replies, setReplies] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
-  const [username, setUsername] = useState("");
-  const [replyText, setReplyText] = useState<any>({});
 
-  // 🔥 ログイン＆ユーザー名取得（修正ポイント）
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) {
-        window.location.href = "/login";
-        return;
-      }
-
-      setUser(u);
-
-      const docRef = await getDoc(doc(db, "users", u.uid));
-      const data = docRef.data();
-
-      setUsername(data?.username || "ユーザー");
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!u) window.location.href = "/login";
+      else setUser(u);
     });
-
     return () => unsub();
   }, []);
 
-  // 投稿取得
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     return onSnapshot(q, (snap) => {
@@ -52,21 +32,6 @@ export default function Home() {
     });
   }, []);
 
-  // いいね
-  useEffect(() => {
-    return onSnapshot(collection(db, "likes"), (snap) => {
-      setLikes(snap.docs.map(d => d.data()));
-    });
-  }, []);
-
-  // 返信
-  useEffect(() => {
-    return onSnapshot(collection(db, "replies"), (snap) => {
-      setReplies(snap.docs.map(d => d.data()));
-    });
-  }, []);
-
-  // 📝 投稿
   const handlePost = async () => {
     if (!text || !user) return;
 
@@ -74,44 +39,23 @@ export default function Home() {
       text,
       createdAt: Date.now(),
       uid: user.uid,
-      username: username, // 🔥 これ重要
+      username: user.email.split("@")[0], // 仮ユーザー名
     });
 
     setText("");
   };
 
-  // ❤️ いいね
-  const toggleLike = async (postId: string) => {
-    const id = user.uid + "_" + postId;
-    const liked = likes.find(l => l.postId === postId && l.uid === user.uid);
-
-    if (liked) {
-      await deleteDoc(doc(db, "likes", id));
-    } else {
-      await setDoc(doc(db, "likes", id), {
-        uid: user.uid,
-        postId,
-      });
-    }
-  };
-
-  const getLikeCount = (postId: string) =>
-    likes.filter(l => l.postId === postId).length;
-
-  // 💬 返信
-  const sendReply = async (postId: string) => {
-    if (!replyText[postId]) return;
-
-    await addDoc(collection(db, "replies"), {
-      text: replyText[postId],
-      postId,
-      uid: user.uid,
-      username: username, // 🔥 これ追加
-      createdAt: Date.now(),
+  // 🔥 トレンド生成
+  const words: any = {};
+  posts.forEach(p => {
+    p.text.split(" ").forEach((w: string) => {
+      words[w] = (words[w] || 0) + 1;
     });
+  });
 
-    setReplyText({ ...replyText, [postId]: "" });
-  };
+  const trends = Object.entries(words)
+    .sort((a: any, b: any) => b[1] - a[1])
+    .slice(0, 5);
 
   if (!user) return null;
 
@@ -119,72 +63,52 @@ export default function Home() {
     <main className="flex justify-center bg-gray-100 min-h-screen">
 
       {/* 左 */}
-      <div className="w-[250px] p-4 hidden md:block">
-        <h1 className="text-2xl font-bold mb-6">Critter</h1>
-
-        <Link href="/"><p>🏠 ホーム</p></Link>
-        <Link href="/profile"><p className="mt-2">👤 プロフィール</p></Link>
-
-        <button onClick={() => signOut(auth)} className="mt-6 text-red-500">
-          ログアウト
-        </button>
+      <div className="w-[200px] p-4">
+        <Link href="/">🏠 ホーム</Link>
+        <br />
+        <Link href="/profile">👤 プロフィール</Link>
       </div>
 
       {/* メイン */}
-      <div className="w-[600px] bg-white border-x p-4">
+      <div className="w-[600px] bg-white p-4">
 
-        {/* 投稿 */}
-        <div className="border-b pb-4 mb-4">
-          <textarea
-            className="w-full p-2 border"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <button onClick={handlePost} className="bg-blue-500 text-white px-4 py-1 mt-2">
-            投稿
-          </button>
-        </div>
+        <textarea
+          className="w-full border p-2"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
 
-        {/* 投稿一覧 */}
+        <button onClick={handlePost} className="bg-blue-500 text-white px-3 py-1 mt-2">
+          投稿
+        </button>
+
         {posts.map((post) => (
-          <div key={post.id} className="border-b p-4">
+          <Link href="/profile" key={post.id}>
+            <div className="border-b p-4 cursor-pointer hover:bg-gray-100">
 
-            <p className="font-bold">{post.username}</p>
-            <p>{post.text}</p>
+              <p className="font-bold">
+                {post.username || "ユーザー"}
+              </p>
 
-            <div className="flex gap-4 mt-2">
-              <button onClick={() => toggleLike(post.id)}>
-                ❤️ {getLikeCount(post.id)}
-              </button>
+              <p>{post.text}</p>
+
             </div>
+          </Link>
+        ))}
 
-            {/* 返信 */}
-            <div className="mt-2">
-              <input
-                className="border p-1 w-full"
-                value={replyText[post.id] || ""}
-                onChange={(e) =>
-                  setReplyText({ ...replyText, [post.id]: e.target.value })
-                }
-              />
-              <button onClick={() => sendReply(post.id)} className="text-blue-500 text-sm">
-                返信
-              </button>
-            </div>
+      </div>
 
-            <div className="ml-4 mt-2">
-              {replies
-                .filter(r => r.postId === post.id)
-                .map((r, i) => (
-                  <p key={i} className="text-sm">
-                    {r.username}: {r.text}
-                  </p>
-                ))}
-            </div>
+      {/* 右（トレンド） */}
+      <div className="w-[200px] p-4">
+        <h2 className="font-bold mb-2">🔥 トレンド</h2>
 
-          </div>
+        {trends.map((t: any, i) => (
+          <p key={i}>
+            {t[0]} ({t[1]})
+          </p>
         ))}
       </div>
+
     </main>
   );
 }

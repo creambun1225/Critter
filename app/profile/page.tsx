@@ -11,27 +11,18 @@ import {
   onSnapshot
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import Link from "next/link";
 
 export default function Profile() {
-  const [user, setUser] = useState<any>(null);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<any>({});
   const [posts, setPosts] = useState<any[]>([]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) {
-        window.location.href = "/login";
-        return;
-      }
+      if (!u) return;
 
-      setUser(u);
-
-      // 🔥 プロフィール取得
       const docRef = await getDoc(doc(db, "users", u.uid));
-      setData(docRef.data());
+      setData(docRef.data() || {});
 
-      // 🔥 投稿取得
       const q = query(collection(db, "posts"), where("uid", "==", u.uid));
       onSnapshot(q, (snap) => {
         setPosts(snap.docs.map(d => d.data()));
@@ -41,20 +32,24 @@ export default function Profile() {
     return () => unsub();
   }, []);
 
-  // 🔥 読み込み中対策
-  if (!data) {
-    return <p className="p-4">読み込み中...</p>;
-  }
-
   return (
     <div className="max-w-[600px] mx-auto">
 
       {/* ヘッダー */}
-      <div className="h-32 bg-gray-300"></div>
+      <div
+        className="h-32 bg-gray-300"
+        style={{
+          backgroundImage: `url(${data.header || ""})`,
+          backgroundSize: "cover"
+        }}
+      />
 
       {/* アイコン */}
       <div className="-mt-10 ml-4">
-        <div className="w-20 h-20 bg-gray-400 rounded-full border-4 border-white"></div>
+        <img
+          src={data.icon || "/default.png"}
+          className="w-20 h-20 rounded-full border-4 border-white object-cover"
+        />
       </div>
 
       <div className="p-4">
@@ -65,12 +60,6 @@ export default function Profile() {
         <p className="text-gray-500">
           {data.bio || "自己紹介なし"}
         </p>
-
-        <Link href="/settings">
-          <button className="mt-3 border px-3 py-1 rounded">
-            プロフィールを編集
-          </button>
-        </Link>
 
         {/* 投稿 */}
         <div className="mt-4">
