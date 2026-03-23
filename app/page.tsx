@@ -8,19 +8,31 @@ import {
   addDoc,
   query,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 export default function Home() {
   const [posts, setPosts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [userData, setUserData] = useState<any>({});
+  const [likes, setLikes] = useState<any>({});
+  const [bookmarks, setBookmarks] = useState<any>({});
+  const [trends, setTrends] = useState<string[]>([]);
 
   // ログインチェック
   useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
+    return onAuthStateChanged(auth, async (u) => {
       if (!u) window.location.href = "/login";
-      else setUser(u);
+      else {
+        setUser(u);
+        const d = await getDoc(doc(db, "users", u.uid));
+        setUserData(d.data());
+      }
     });
   }, []);
 
@@ -32,17 +44,68 @@ export default function Home() {
     });
   }, []);
 
-  // 投稿
-  const createPost = async () => {
-    const text = prompt("投稿内容");
-    if (!text || !user) return;
-
-    await addDoc(collection(db, "posts"), {
-      text,
-      createdAt: Date.now(),
-      uid: user.uid
-    });
+  // 👍いいね
+  const toggleLike = async (postId: string) => {
+    const ref = doc(db, "likes", user.uid + "_" + postId);
+    if (likes[postId]) await deleteDoc(ref);
+    else await setDoc(ref, { uid: user.uid, postId });
   };
+
+  // 🔖ブックマーク
+  const toggleBookmark = async (postId: string) => {
+    const ref = doc(db, "bookmarks", user.uid + "_" + postId);
+    if (bookmarks[postId]) await deleteDoc(ref);
+    else await setDoc(ref, { uid: user.uid, postId });
+  };
+
+  // 状態取得
+  useEffect(() => {
+    if (!user) return;
+
+    const unsub1 = onSnapshot(collection(db, "likes"), (snap) => {
+      const data:any = {};
+      snap.docs.forEach(d=>{
+        const v = d.data();
+        if(v.uid===user.uid) data[v.postId]=true;
+      });
+      setLikes(data);
+    });
+
+    const unsub2 = onSnapshot(collection(db, "bookmarks"), (snap) => {
+      const data:any = {};
+      snap.docs.forEach(d=>{
+        const v = d.data();
+        if(v.uid===user.uid) data[v.postId]=true;
+      });
+      setBookmarks(data);
+    });
+
+    return () => {
+      unsub1();
+      unsub2();
+    };
+  }, [user]);
+
+  // 🔥トレンド
+  useEffect(() => {
+    const words:any = {};
+
+    posts.forEach(p=>{
+      if(!p.text) return;
+
+      p.text.split(/[\s　]+/).forEach((w:string)=>{
+        if(w.length<2) return;
+        words[w]=(words[w]||0)+1;
+      });
+    });
+
+    const sorted = Object.entries(words)
+      .sort((a:any,b:any)=>b[1]-a[1])
+      .slice(0,5)
+      .map((w:any)=>w[0]);
+
+    setTrends(sorted);
+  },[posts]);
 
   if (!user) return null;
 
@@ -50,43 +113,92 @@ export default function Home() {
     <main className="flex justify-center bg-[#f5f8fa] min-h-screen">
 
       {/* 左メニュー */}
-      <div className="w-[250px] p-6 border-r">
-        <h1 className="text-2xl font-bold mb-6">Critter</h1>
+      <div className="w-[250px] p-6 border-r flex flex-col justify-between">
 
-        <div className="flex flex-col gap-6 text-lg">
-          <Link href="/">🏠 ホーム</Link>
-          <Link href="/profile">👤 プロフィール</Link>
+        <div>
+          <h1 className="text-3xl font-bold text-blue-500 mb-8">Critter</h1>
+
+          <div className="flex flex-col gap-7 text-xl font-medium">
+            <Link href="/">🏠 ホーム</Link>
+            <Link href="/notifications">🔔 通知</Link>
+            <Link href="/profile">👤 プロフィール</Link>
+            <Link href="/bookmarks">🔖 ブックマーク</Link>
+            <Link href="/settings">⚙️ 設定</Link>
+          </div>
+
+          <button
+            onClick={() => signOut(auth)}
+            className="mt-10 text-red-500 text-lg"
+          >
+            ログアウト
+          </button>
         </div>
 
+        {/* 投稿ボタン */}
         <button
-          onClick={createPost}
-          className="mt-6 bg-blue-500 text-white p-2 rounded"
+          onClick={async ()=>{
+            const t = prompt("投稿内容");
+            if(!t) return;
+
+            await addDoc(collection(db,"posts"),{
+              text:t,
+              createdAt:Date.now(),
+              uid:user.uid,
+              username:userData?.username || "unknown"
+            });
+          }}
+          className="bg-blue-500 text-white py-3 rounded-full"
         >
-          ＋ 投稿
+          ＋ クリート
         </button>
+
       </div>
 
       {/* タイムライン */}
       <div className="w-[600px] bg-white border-x">
 
         {posts.map(p => (
-          <div key={p.id} className="p-4 border-b">
+          <div key={p.id} className="p-4 border-b hover:bg-gray-50">
+
             <Link href={`/user/${p.uid}`}>
-              <p className="font-bold">{p.username || "unknown"}</p>
+              <p className="font-bold text-sm hover:underline">
+                {p.username || "unknown"}
+              </p>
             </Link>
 
             <Link href={`/post/${p.id}`}>
-              <p>{p.text}</p>
+              <p className="mt-1 text-[15px]">{p.text}</p>
             </Link>
+
+            {/* アクション */}
+            <div className="flex justify-between mt-3 text-sm text-gray-500">
+
+              <button onClick={()=>toggleLike(p.id)}>
+                {likes[p.id] ? "❤️" : "🤍"} 1
+              </button>
+
+              <Link href={`/post/${p.id}`}>💬 0</Link>
+
+              <span>🔁 0</span>
+
+              <button onClick={()=>toggleBookmark(p.id)}>
+                🔖
+              </button>
+
+              <span>👁 1</span>
+
+            </div>
+
           </div>
         ))}
 
       </div>
 
-      {/* 右 */}
+      {/* トレンド */}
       <div className="w-[250px] p-4">
-        <div className="bg-white p-4 rounded">
-          トレンド
+        <div className="bg-white p-4 rounded-xl">
+          <h2 className="font-bold mb-2">🔥 トレンド</h2>
+          {trends.map((t,i)=><p key={i}>{t}</p>)}
         </div>
       </div>
 
