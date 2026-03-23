@@ -24,6 +24,7 @@ export default function Home() {
   const [bookmarks, setBookmarks] = useState<any>({});
   const [trends, setTrends] = useState<string[]>([]);
 
+  // ログイン
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       if (!u) window.location.href = "/login";
@@ -35,6 +36,7 @@ export default function Home() {
     });
   }, []);
 
+  // 投稿取得
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     return onSnapshot(q, (snap) => {
@@ -108,24 +110,23 @@ export default function Home() {
   if (!user) return null;
 
   return (
-    <main className="flex justify-center bg-gray-100 min-h-screen">
+    <main className="flex justify-center bg-[#f5f8fa] min-h-screen">
 
       {/* 左メニュー */}
-      <div className="w-[250px] p-6 space-y-6 text-lg">
+      <div className="w-[250px] p-6 space-y-6 border-r">
 
-        <h1 className="text-3xl font-bold">Critter</h1>
+        <h1 className="text-3xl font-bold text-blue-500">Critter</h1>
 
-        <div className="space-y-4 text-xl">
-          <Link href="/">🏠 ホーム</Link><br/>
-          <Link href="/notifications">🔔 通知</Link><br/>
-          <Link href="/profile">👤 プロフィール</Link><br/>
-          <Link href="/bookmarks">🔖 ブックマーク</Link>
+        <div className="space-y-5 text-xl font-medium">
+          <Link href="/" className="block hover:text-blue-500">🏠 ホーム</Link>
+          <Link href="/notifications" className="block hover:text-blue-500">🔔 通知</Link>
+          <Link href="/profile" className="block hover:text-blue-500">👤 プロフィール</Link>
+          <Link href="/bookmarks" className="block hover:text-blue-500">🔖 ブックマーク</Link>
         </div>
 
-        {/* クリート */}
         <button
           onClick={async ()=>{
-            const t = prompt("投稿");
+            const t = prompt("投稿内容");
             if(!t) return;
 
             await addDoc(collection(db,"posts"),{
@@ -135,7 +136,7 @@ export default function Home() {
               username:userData?.username || "unknown"
             });
           }}
-          className="bg-blue-500 text-white w-full py-3 rounded-full"
+          className="bg-blue-500 text-white w-full py-3 rounded-full font-bold"
         >
           ＋ クリート
         </button>
@@ -146,20 +147,22 @@ export default function Home() {
       <div className="w-[600px] bg-white border-x">
 
         {posts.map(p => (
-          <div key={p.id} className="p-4 border-b">
+          <div key={p.id} className="p-4 border-b hover:bg-gray-50">
 
-            {/* 名前クリック → プロフィール */}
+            {/* 名前 */}
             <Link href={`/user/${p.uid}`}>
-              <p className="font-bold cursor-pointer">{p.username}</p>
+              <p className="font-bold text-sm hover:underline cursor-pointer">
+                {p.username}
+              </p>
             </Link>
 
-            {/* 本文クリック → 詳細 */}
+            {/* 本文 */}
             <Link href={`/post/${p.id}`}>
-              <p className="cursor-pointer">{p.text}</p>
+              <p className="mt-1 text-[15px] cursor-pointer">{p.text}</p>
             </Link>
 
-            {/* 機能 */}
-            <div className="flex gap-6 mt-2 text-sm">
+            {/* アクション */}
+            <div className="flex justify-between mt-3 text-sm text-gray-500">
 
               <button onClick={()=>toggleLike(p.id)}>
                 {likes[p.id] ? "❤️" : "🤍"} 1
@@ -184,8 +187,13 @@ export default function Home() {
 
       {/* トレンド */}
       <div className="w-[250px] p-4">
-        <h2 className="font-bold mb-2">🔥 トレンド</h2>
-        {trends.map((t,i)=><p key={i}>{t}</p>)}
+        <div className="bg-white p-4 rounded-xl">
+          <h2 className="font-bold mb-2">🔥 トレンド</h2>
+
+          {trends.map((t,i)=>(
+            <p key={i} className="py-1">{t}</p>
+          ))}
+        </div>
       </div>
 
     </main>
