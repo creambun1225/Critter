@@ -11,43 +11,49 @@ import {
   onSnapshot,
   doc,
   setDoc,
-  deleteDoc
+  deleteDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 export default function Home() {
   const [text, setText] = useState("");
   const [posts, setPosts] = useState<any[]>([]);
+  const [likes, setLikes] = useState<any[]>([]);
+  const [replies, setReplies] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [replyText, setReplyText] = useState<any>({});
 
-  // ログインチェック
+  // ログイン
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) {
-        window.location.href = "/login";
-      } else {
-        setUser(u);
-      }
+      if (!u) window.location.href = "/login";
+      else setUser(u);
     });
-    return () => unsub();
-  }, []);
-
-  // 投稿取得
-  useEffect(() => {
-    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
-
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setPosts(data);
-    });
-
     return () => unsub();
   }, []);
 
   // 投稿
+  useEffect(() => {
+    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+    return onSnapshot(q, (snap) => {
+      setPosts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, []);
+
+  // いいね取得
+  useEffect(() => {
+    return onSnapshot(collection(db, "likes"), (snap) => {
+      setLikes(snap.docs.map(doc => doc.data()));
+    });
+  }, []);
+
+  // 返信取得
+  useEffect(() => {
+    return onSnapshot(collection(db, "replies"), (snap) => {
+      setReplies(snap.docs.map(doc => doc.data()));
+    });
+  }, []);
+
   const handlePost = async () => {
     if (!text || !user) return;
 
@@ -61,27 +67,35 @@ export default function Home() {
   };
 
   // ❤️ いいね
-  const likePost = async (postId: string) => {
-    await setDoc(doc(db, "likes", user.uid + "_" + postId), {
-      uid: user.uid,
+  const toggleLike = async (postId: string) => {
+    const id = user.uid + "_" + postId;
+    const liked = likes.find(l => l.postId === postId && l.uid === user.uid);
+
+    if (liked) {
+      await deleteDoc(doc(db, "likes", id));
+    } else {
+      await setDoc(doc(db, "likes", id), {
+        uid: user.uid,
+        postId,
+      });
+    }
+  };
+
+  const getLikeCount = (postId: string) =>
+    likes.filter(l => l.postId === postId).length;
+
+  // 💬 返信
+  const sendReply = async (postId: string) => {
+    if (!replyText[postId]) return;
+
+    await addDoc(collection(db, "replies"), {
+      text: replyText[postId],
       postId,
+      uid: user.uid,
+      createdAt: Date.now(),
     });
-  };
 
-  const unlikePost = async (postId: string) => {
-    await deleteDoc(doc(db, "likes", user.uid + "_" + postId));
-  };
-
-  // 👤 フォロー
-  const followUser = async (targetUid: string) => {
-    await setDoc(doc(db, "follows", user.uid + "_" + targetUid), {
-      follower: user.uid,
-      following: targetUid,
-    });
-  };
-
-  const unfollowUser = async (targetUid: string) => {
-    await deleteDoc(doc(db, "follows", user.uid + "_" + targetUid));
+    setReplyText({ ...replyText, [postId]: "" });
   };
 
   if (!user) return null;
@@ -89,18 +103,14 @@ export default function Home() {
   return (
     <main className="flex justify-center bg-gray-100 min-h-screen">
 
-      {/* 左メニュー */}
+      {/* 左 */}
       <div className="w-[250px] p-4 hidden md:block">
         <h1 className="text-2xl font-bold mb-6">Critter</h1>
-        <p>🏠 ホーム</p>
-        <Link href="/profile">
-          <p className="mt-2 cursor-pointer">👤 プロフィール</p>
-        </Link>
 
-        <button
-          onClick={() => signOut(auth)}
-          className="mt-6 text-red-500"
-        >
+        <Link href="/"><p>🏠 ホーム</p></Link>
+        <Link href="/profile"><p className="mt-2">👤 プロフィール</p></Link>
+
+        <button onClick={() => signOut(auth)} className="mt-6 text-red-500">
           ログアウト
         </button>
       </div>
@@ -108,48 +118,59 @@ export default function Home() {
       {/* メイン */}
       <div className="w-[600px] bg-white border-x p-4">
 
-        {/* 投稿欄 */}
+        {/* 投稿 */}
         <div className="border-b pb-4 mb-4">
           <textarea
-            className="w-full p-2 border rounded"
+            className="w-full p-2 border"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="いまどうしてる？"
           />
-          <button
-            onClick={handlePost}
-            className="mt-2 bg-blue-500 text-white px-4 py-1 rounded"
-          >
+          <button onClick={handlePost} className="bg-blue-500 text-white px-4 py-1 mt-2">
             投稿
           </button>
         </div>
 
         {/* 投稿一覧 */}
         {posts.map((post) => (
-          <div key={post.id} className="border-b p-4 flex gap-3">
+          <div key={post.id} className="border-b p-4">
 
-            {/* アイコン */}
-            <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
+            <p className="font-bold">{post.uid}</p>
+            <p>{post.text}</p>
 
-            {/* 内容 */}
-            <div className="flex-1">
-              <p className="font-bold">{post.uid}</p>
-              <p>{post.text}</p>
+            {/* アクション */}
+            <div className="flex gap-4 mt-2">
+              <button onClick={() => toggleLike(post.id)}>
+                ❤️ {getLikeCount(post.id)}
+              </button>
+            </div>
 
-              {/* アクション */}
-              <div className="flex gap-4 mt-2 text-sm">
+            {/* 返信入力 */}
+            <div className="mt-2">
+              <input
+                placeholder="返信..."
+                className="border p-1 w-full"
+                value={replyText[post.id] || ""}
+                onChange={(e) =>
+                  setReplyText({ ...replyText, [post.id]: e.target.value })
+                }
+              />
+              <button
+                onClick={() => sendReply(post.id)}
+                className="text-blue-500 text-sm mt-1"
+              >
+                返信
+              </button>
+            </div>
 
-                <button onClick={() => likePost(post.id)}>
-                  ❤️ いいね
-                </button>
-
-                {post.uid !== user.uid && (
-                  <button onClick={() => followUser(post.uid)}>
-                    フォロー
-                  </button>
-                )}
-
-              </div>
+            {/* 返信一覧 */}
+            <div className="ml-4 mt-2">
+              {replies
+                .filter(r => r.postId === post.id)
+                .map((r, i) => (
+                  <p key={i} className="text-sm border-l pl-2">
+                    {r.uid}: {r.text}
+                  </p>
+                ))}
             </div>
 
           </div>
