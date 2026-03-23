@@ -10,6 +10,8 @@ import {
   orderBy,
   onSnapshot,
   doc,
+  setDoc,
+  deleteDoc,
   getDoc
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -17,41 +19,52 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 export default function Home() {
   const [text, setText] = useState("");
   const [posts, setPosts] = useState<any[]>([]);
+  const [likes, setLikes] = useState<any[]>([]);
+  const [replies, setReplies] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [replyText, setReplyText] = useState<any>({});
 
-  // ログイン＆ユーザー情報取得
+  // ログイン＆ユーザー情報
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
         window.location.href = "/login";
-      } else {
-        setUser(u);
-
-        // 🔥 ユーザー情報取得
-        const docRef = await getDoc(doc(db, "users", u.uid));
-        setUserData(docRef.data());
+        return;
       }
+
+      setUser(u);
+
+      const docRef = await getDoc(doc(db, "users", u.uid));
+      setUserData(docRef.data());
     });
+
     return () => unsub();
   }, []);
 
-  // 投稿取得
+  // 投稿
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
-
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setPosts(data);
+    return onSnapshot(q, (snap) => {
+      setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-
-    return () => unsub();
   }, []);
 
-  // 投稿（←ここが重要）
+  // いいね
+  useEffect(() => {
+    return onSnapshot(collection(db, "likes"), (snap) => {
+      setLikes(snap.docs.map(d => d.data()));
+    });
+  }, []);
+
+  // 返信
+  useEffect(() => {
+    return onSnapshot(collection(db, "replies"), (snap) => {
+      setReplies(snap.docs.map(d => d.data()));
+    });
+  }, []);
+
+  // 投稿処理
   const handlePost = async () => {
     if (!text || !user || !userData) return;
 
@@ -59,12 +72,42 @@ export default function Home() {
       text,
       createdAt: Date.now(),
       uid: user.uid,
-
-      // 🔥 これ追加（ユーザー名保存）
       username: userData.username || "ユーザー",
     });
 
     setText("");
+  };
+
+  // ❤️ いいね
+  const toggleLike = async (postId: string) => {
+    const id = user.uid + "_" + postId;
+    const liked = likes.find(l => l.postId === postId && l.uid === user.uid);
+
+    if (liked) {
+      await deleteDoc(doc(db, "likes", id));
+    } else {
+      await setDoc(doc(db, "likes", id), {
+        uid: user.uid,
+        postId,
+      });
+    }
+  };
+
+  const getLikeCount = (postId: string) =>
+    likes.filter(l => l.postId === postId).length;
+
+  // 💬 返信
+  const sendReply = async (postId: string) => {
+    if (!replyText[postId]) return;
+
+    await addDoc(collection(db, "replies"), {
+      text: replyText[postId],
+      postId,
+      uid: user.uid,
+      createdAt: Date.now(),
+    });
+
+    setReplyText({ ...replyText, [postId]: "" });
   };
 
   if (!user) return null;
@@ -72,22 +115,14 @@ export default function Home() {
   return (
     <main className="flex justify-center bg-gray-100 min-h-screen">
 
-      {/* 左メニュー */}
+      {/* 左 */}
       <div className="w-[250px] p-4 hidden md:block">
         <h1 className="text-2xl font-bold mb-6">Critter</h1>
 
-        <Link href="/">
-          <p className="cursor-pointer hover:text-blue-500">🏠 ホーム</p>
-        </Link>
+        <Link href="/"><p>🏠 ホーム</p></Link>
+        <Link href="/profile"><p className="mt-2">👤 プロフィール</p></Link>
 
-        <Link href="/profile">
-          <p className="cursor-pointer hover:text-blue-500 mt-2">👤 プロフィール</p>
-        </Link>
-
-        <button
-          onClick={() => signOut(auth)}
-          className="mt-6 text-red-500"
-        >
+        <button onClick={() => signOut(auth)} className="mt-6 text-red-500">
           ログアウト
         </button>
       </div>
@@ -95,18 +130,14 @@ export default function Home() {
       {/* メイン */}
       <div className="w-[600px] bg-white border-x p-4">
 
-        {/* 投稿欄 */}
+        {/* 投稿 */}
         <div className="border-b pb-4 mb-4">
           <textarea
-            className="w-full p-2 border rounded"
+            className="w-full p-2 border"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="いまどうしてる？"
           />
-          <button
-            onClick={handlePost}
-            className="mt-2 bg-blue-500 text-white px-4 py-1 rounded"
-          >
+          <button onClick={handlePost} className="bg-blue-500 text-white px-4 py-1 mt-2">
             投稿
           </button>
         </div>
@@ -115,16 +146,41 @@ export default function Home() {
         {posts.map((post) => (
           <div key={post.id} className="border-b p-4">
 
-            {/* 🔥 UIDじゃなく名前表示 */}
-            <p className="font-bold">
-              {post.username || "ユーザー"}
-            </p>
-
+            <p className="font-bold">{post.username}</p>
             <p>{post.text}</p>
+
+            <div className="flex gap-4 mt-2">
+              <button onClick={() => toggleLike(post.id)}>
+                ❤️ {getLikeCount(post.id)}
+              </button>
+            </div>
+
+            {/* 返信 */}
+            <div className="mt-2">
+              <input
+                className="border p-1 w-full"
+                value={replyText[post.id] || ""}
+                onChange={(e) =>
+                  setReplyText({ ...replyText, [post.id]: e.target.value })
+                }
+              />
+              <button onClick={() => sendReply(post.id)} className="text-blue-500 text-sm">
+                返信
+              </button>
+            </div>
+
+            <div className="ml-4 mt-2">
+              {replies
+                .filter(r => r.postId === post.id)
+                .map((r, i) => (
+                  <p key={i} className="text-sm">
+                    {r.uid}: {r.text}
+                  </p>
+                ))}
+            </div>
 
           </div>
         ))}
-
       </div>
     </main>
   );
