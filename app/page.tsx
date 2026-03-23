@@ -10,19 +10,20 @@ import {
   orderBy,
   onSnapshot,
   doc,
-  getDoc
+  getDoc,
+  setDoc,
+  deleteDoc
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
 export default function Home() {
-  const [text, setText] = useState("");
   const [posts, setPosts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>({});
+  const [likes, setLikes] = useState<any>({});
+  const [bookmarks, setBookmarks] = useState<any>({});
   const [trends, setTrends] = useState<string[]>([]);
-  const [showPostBox, setShowPostBox] = useState(false); // ← 追加
 
-  // ログイン
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       if (!u) window.location.href = "/login";
@@ -34,7 +35,6 @@ export default function Home() {
     });
   }, []);
 
-  // 投稿取得
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     return onSnapshot(q, (snap) => {
@@ -42,121 +42,151 @@ export default function Home() {
     });
   }, []);
 
-  // トレンド修正
+  // 👍いいね
+  const toggleLike = async (postId: string) => {
+    const ref = doc(db, "likes", user.uid + "_" + postId);
+    if (likes[postId]) await deleteDoc(ref);
+    else await setDoc(ref, { uid: user.uid, postId });
+  };
+
+  // 🔖ブックマーク
+  const toggleBookmark = async (postId: string) => {
+    const ref = doc(db, "bookmarks", user.uid + "_" + postId);
+    if (bookmarks[postId]) await deleteDoc(ref);
+    else await setDoc(ref, { uid: user.uid, postId });
+  };
+
+  // 状態取得
   useEffect(() => {
-    const words: any = {};
+    if (!user) return;
 
-    posts.forEach((p) => {
-      if (!p.text) return;
+    const unsub1 = onSnapshot(collection(db, "likes"), (snap) => {
+      const data:any = {};
+      snap.docs.forEach(d=>{
+        const v = d.data();
+        if(v.uid===user.uid) data[v.postId]=true;
+      });
+      setLikes(data);
+    });
 
-      const split = p.text.split(/[\s　]+/);
+    const unsub2 = onSnapshot(collection(db, "bookmarks"), (snap) => {
+      const data:any = {};
+      snap.docs.forEach(d=>{
+        const v = d.data();
+        if(v.uid===user.uid) data[v.postId]=true;
+      });
+      setBookmarks(data);
+    });
 
-      split.forEach((w: string) => {
-        if (w.length < 2) return;
+    return () => {
+      unsub1();
+      unsub2();
+    };
+  }, [user]);
 
-        // すでに #ついてるやつだけ対象
-        if (!w.startsWith("#")) return;
+  // 🔥トレンド（単語＋#）
+  useEffect(() => {
+    const words:any = {};
 
-        words[w] = (words[w] || 0) + 1;
+    posts.forEach(p=>{
+      if(!p.text) return;
+
+      p.text.split(/[\s　]+/).forEach((w:string)=>{
+        if(w.length<2) return;
+        words[w]=(words[w]||0)+1;
       });
     });
 
     const sorted = Object.entries(words)
-      .sort((a: any, b: any) => b[1] - a[1])
-      .slice(0, 5)
-      .map((w: any) => w[0]);
+      .sort((a:any,b:any)=>b[1]-a[1])
+      .slice(0,5)
+      .map((w:any)=>w[0]);
 
     setTrends(sorted);
-  }, [posts]);
-
-  // 投稿
-  const handlePost = async () => {
-    if (!text || !user) return;
-
-    await addDoc(collection(db, "posts"), {
-      text,
-      createdAt: Date.now(),
-      uid: user.uid,
-      username: userData?.username || "unknown",
-    });
-
-    setText("");
-    setShowPostBox(false); // 閉じる
-  };
+  },[posts]);
 
   if (!user) return null;
 
   return (
     <main className="flex justify-center bg-gray-100 min-h-screen">
 
-      {/* 左 */}
-      <div className="w-[250px] p-4">
-        <h1 className="text-2xl font-bold mb-6">Karotter</h1>
+      {/* 左メニュー */}
+      <div className="w-[250px] p-6 space-y-6 text-lg">
 
-        <Link href="/">🏠 ホーム</Link><br/>
-        <Link href="/profile">👤 プロフィール</Link>
+        <h1 className="text-3xl font-bold">Critter</h1>
+
+        <div className="space-y-4 text-xl">
+          <Link href="/">🏠 ホーム</Link><br/>
+          <Link href="/notifications">🔔 通知</Link><br/>
+          <Link href="/profile">👤 プロフィール</Link><br/>
+          <Link href="/bookmarks">🔖 ブックマーク</Link>
+        </div>
+
+        {/* クリート */}
+        <button
+          onClick={async ()=>{
+            const t = prompt("投稿");
+            if(!t) return;
+
+            await addDoc(collection(db,"posts"),{
+              text:t,
+              createdAt:Date.now(),
+              uid:user.uid,
+              username:userData?.username || "unknown"
+            });
+          }}
+          className="bg-blue-500 text-white w-full py-3 rounded-full"
+        >
+          ＋ クリート
+        </button>
+
       </div>
 
-      {/* 中央 */}
+      {/* 投稿 */}
       <div className="w-[600px] bg-white border-x">
 
-        {/* 投稿一覧 */}
         {posts.map(p => (
-          <Link href={`/user/${p.uid}`} key={p.id}>
-            <div className="p-4 border-b cursor-pointer hover:bg-gray-50">
-              <p className="font-bold">{p.username}</p>
-              <p>{p.text}</p>
-            </div>
-          </Link>
-        ))}
+          <div key={p.id} className="p-4 border-b">
 
-      </div>
+            {/* 名前クリック → プロフィール */}
+            <Link href={`/user/${p.uid}`}>
+              <p className="font-bold cursor-pointer">{p.username}</p>
+            </Link>
 
-      {/* 右（トレンド） */}
-      <div className="w-[250px] p-4">
-        <h2 className="font-bold mb-3">🔥 トレンド</h2>
+            {/* 本文クリック → 詳細 */}
+            <Link href={`/post/${p.id}`}>
+              <p className="cursor-pointer">{p.text}</p>
+            </Link>
 
-        {trends.length === 0 && <p>まだなし</p>}
+            {/* 機能 */}
+            <div className="flex gap-6 mt-2 text-sm">
 
-        {trends.map((t, i) => (
-          <p key={i}>{t}</p> // ← #勝手に付けない
-        ))}
-      </div>
-
-      {/* ＋クリート */}
-      <div
-        onClick={() => setShowPostBox(true)}
-        className="fixed bottom-5 left-5 bg-blue-500 text-white px-6 py-3 rounded-full cursor-pointer shadow-lg"
-      >
-        ＋ クリート
-      </div>
-
-      {/* 投稿モーダル */}
-      {showPostBox && (
-        <div className="fixed inset-0 bg-black/40 flex justify-center items-center">
-          <div className="bg-white p-4 w-[400px] rounded">
-
-            <textarea
-              className="w-full border p-2"
-              value={text}
-              onChange={(e)=>setText(e.target.value)}
-              placeholder="いまどうしてる？"
-            />
-
-            <div className="flex justify-between mt-3">
-              <button onClick={()=>setShowPostBox(false)}>キャンセル</button>
-
-              <button
-                onClick={handlePost}
-                className="bg-blue-500 text-white px-4 py-1 rounded"
-              >
-                投稿
+              <button onClick={()=>toggleLike(p.id)}>
+                {likes[p.id] ? "❤️" : "🤍"} 1
               </button>
+
+              <Link href={`/post/${p.id}`}>💬 0</Link>
+
+              <span>🔁 0</span>
+
+              <button onClick={()=>toggleBookmark(p.id)}>
+                🔖
+              </button>
+
+              <span>👁 1</span>
+
             </div>
 
           </div>
-        </div>
-      )}
+        ))}
+
+      </div>
+
+      {/* トレンド */}
+      <div className="w-[250px] p-4">
+        <h2 className="font-bold mb-2">🔥 トレンド</h2>
+        {trends.map((t,i)=><p key={i}>{t}</p>)}
+      </div>
 
     </main>
   );
