@@ -5,12 +5,7 @@ import Link from "next/link";
 import { db, auth, storage } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL
-} from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function EditProfile(){
 
@@ -20,15 +15,15 @@ export default function EditProfile(){
   const [username,setUsername]=useState("");
   const [bio,setBio]=useState("");
 
-  const [iconFile,setIconFile]=useState<any>(null);
-  const [headerFile,setHeaderFile]=useState<any>(null);
+  const [iconFile,setIconFile]=useState<File | null>(null);
+  const [headerFile,setHeaderFile]=useState<File | null>(null);
 
   const [iconUrl,setIconUrl]=useState("");
   const [headerUrl,setHeaderUrl]=useState("");
 
   const [trends,setTrends]=useState<string[]>([]);
 
-  // 🔐 ログイン
+  // 🔐 ログインチェック
   useEffect(()=>{
     return onAuthStateChanged(auth,(u)=>{
       if(!u){
@@ -51,18 +46,19 @@ export default function EditProfile(){
     });
   },[]);
 
-  // 🔥 トレンド（簡易）
+  // 🔥 トレンド（仮）
   useEffect(()=>{
     setTrends(["AI","ゲーム","マイクラ","YouTube","学校"]);
   },[]);
 
-  // 🔥 画像アップロード
-  const uploadImage = async (file:any,path:string)=>{
+  // 🔥 画像アップロード関数
+  const uploadImage = async (file:File,path:string)=>{
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, file);
     return await getDownloadURL(storageRef);
   };
 
+  // 💾 保存
   const save = async ()=>{
     if(!user) return;
 
@@ -70,12 +66,15 @@ export default function EditProfile(){
     let newHeader = headerUrl;
 
     try{
+
+      // アイコン更新
       if(iconFile){
-        newIcon = await uploadImage(iconFile,"icons/"+user.uid);
+        newIcon = await uploadImage(iconFile, "icons/"+user.uid);
       }
 
+      // ヘッダー更新
       if(headerFile){
-        newHeader = await uploadImage(headerFile,"headers/"+user.uid);
+        newHeader = await uploadImage(headerFile, "headers/"+user.uid);
       }
 
       await setDoc(doc(db,"users",user.uid),{
@@ -90,7 +89,7 @@ export default function EditProfile(){
 
     }catch(e){
       console.log(e);
-      alert("保存失敗（Storageか設定ミス）");
+      alert("保存失敗（Storage設定ミスの可能性）");
     }
   };
 
@@ -142,17 +141,19 @@ export default function EditProfile(){
           onChange={(e)=>setBio(e.target.value)}
         />
 
-        <p>アイコン</p>
+        <p>アイコン画像</p>
         <input
           type="file"
-          onChange={(e)=>setIconFile(e.target.files?.[0])}
+          accept="image/*"
+          onChange={(e)=>setIconFile(e.target.files?.[0] || null)}
           className="mb-3"
         />
 
-        <p>ヘッダー</p>
+        <p>ヘッダー画像</p>
         <input
           type="file"
-          onChange={(e)=>setHeaderFile(e.target.files?.[0])}
+          accept="image/*"
+          onChange={(e)=>setHeaderFile(e.target.files?.[0] || null)}
           className="mb-3"
         />
 
