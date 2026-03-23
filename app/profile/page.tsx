@@ -18,15 +18,20 @@ export default function Profile() {
   const [data, setData] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
 
-  // 🔥 ログイン待ち
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) return;
+      if (!u) {
+        window.location.href = "/login";
+        return;
+      }
+
       setUser(u);
 
+      // 🔥 プロフィール取得
       const docRef = await getDoc(doc(db, "users", u.uid));
       setData(docRef.data());
 
+      // 🔥 投稿取得
       const q = query(collection(db, "posts"), where("uid", "==", u.uid));
       onSnapshot(q, (snap) => {
         setPosts(snap.docs.map(d => d.data()));
@@ -36,7 +41,10 @@ export default function Profile() {
     return () => unsub();
   }, []);
 
-  if (!data) return <p className="p-4">読み込み中...</p>;
+  // 🔥 読み込み中対策
+  if (!data) {
+    return <p className="p-4">読み込み中...</p>;
+  }
 
   return (
     <div className="max-w-[600px] mx-auto">
@@ -50,8 +58,13 @@ export default function Profile() {
       </div>
 
       <div className="p-4">
-        <h1 className="text-xl font-bold">{data.username}</h1>
-        <p className="text-gray-500">{data.bio || "自己紹介なし"}</p>
+        <h1 className="text-xl font-bold">
+          {data.username || "ユーザー"}
+        </h1>
+
+        <p className="text-gray-500">
+          {data.bio || "自己紹介なし"}
+        </p>
 
         <Link href="/settings">
           <button className="mt-3 border px-3 py-1 rounded">
