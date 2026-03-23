@@ -16,6 +16,9 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
+// 🔥 これ追加
+const VERSION = "v1.0.0";
+
 export default function Home(){
 
   const [user,setUser]=useState<any>(null);
@@ -23,7 +26,6 @@ export default function Home(){
   const [text,setText]=useState("");
   const [posts,setPosts]=useState<any[]>([]);
 
-  // ログイン
   useEffect(()=>{
     return onAuthStateChanged(auth,(u)=>{
       if(!u) window.location.href="/login";
@@ -31,7 +33,6 @@ export default function Home(){
     });
   },[]);
 
-  // ユーザー情報
   useEffect(()=>{
     if(!user) return;
     getDoc(doc(db,"users",user.uid)).then(d=>{
@@ -39,7 +40,6 @@ export default function Home(){
     });
   },[user]);
 
-  // 投稿取得
   useEffect(()=>{
     const q=query(collection(db,"posts"),orderBy("createdAt","desc"));
 
@@ -53,7 +53,6 @@ export default function Home(){
     return ()=>unsub();
   },[]);
 
-  // 投稿
   const post=async()=>{
     if(!text) return;
 
@@ -71,21 +70,18 @@ export default function Home(){
     setText("");
   };
 
-  // いいね
   const like=async(p:any)=>{
     await updateDoc(doc(db,"posts",p.id),{
       likes:(p.likes||0)+1
     });
   };
 
-  // リポスト
   const repost=async(p:any)=>{
     await updateDoc(doc(db,"posts",p.id),{
       reposts:(p.reposts||0)+1
     });
   };
 
-  // 削除
   const remove=async(id:string)=>{
     if(confirm("削除する？")){
       await deleteDoc(doc(db,"posts",id));
@@ -97,7 +93,7 @@ export default function Home(){
   return (
     <main className="flex justify-center bg-[#f5f8fa] h-screen">
 
-      {/* 左（固定） */}
+      {/* 左 */}
       <div className="w-[250px] p-6 border-r flex flex-col justify-between fixed left-0 top-0 h-screen bg-white">
 
         <div>
@@ -113,19 +109,25 @@ export default function Home(){
         </div>
 
         {/* ＋クリート */}
-        <button
-          onClick={()=>window.scrollTo({top:0})}
-          className="bg-blue-500 text-white rounded-full py-3"
-        >
-          ＋クリート
-        </button>
+        <div>
+          <button
+            onClick={()=>window.scrollTo({top:0})}
+            className="bg-blue-500 text-white rounded-full py-3 w-full"
+          >
+            ＋クリート
+          </button>
+
+          {/* 🔥 バージョン表示 */}
+          <p className="text-gray-400 text-sm mt-4 text-center">
+            {VERSION}
+          </p>
+        </div>
 
       </div>
 
-      {/* 真ん中（スクロール） */}
+      {/* 真ん中 */}
       <div className="w-[600px] ml-[250px] mr-[250px] overflow-y-scroll h-screen bg-white">
 
-        {/* 投稿欄 */}
         <div className="p-4 border-b">
           <textarea
             className="w-full border p-2"
@@ -140,11 +142,9 @@ export default function Home(){
           </button>
         </div>
 
-        {/* 投稿一覧 */}
         {posts.map((p)=>(
           <div key={p.id} className="border-b p-4 relative">
 
-            {/* 削除メニュー */}
             {p.uid===user.uid && (
               <button
                 onClick={()=>remove(p.id)}
@@ -154,29 +154,17 @@ export default function Home(){
               </button>
             )}
 
-            {/* 名前 */}
             <Link href={`/user/${p.uid}`}>
               <p className="font-bold">{p.username}</p>
             </Link>
 
-            {/* 本文 */}
             <p>{p.text}</p>
 
-            {/* アクション */}
             <div className="flex gap-6 mt-2 text-gray-500">
-
               <span>💬 {p.replies}</span>
-
-              <button onClick={()=>repost(p)}>
-                🔁 {p.reposts}
-              </button>
-
-              <button onClick={()=>like(p)}>
-                ❤️ {p.likes}
-              </button>
-
+              <button onClick={()=>repost(p)}>🔁 {p.reposts}</button>
+              <button onClick={()=>like(p)}>❤️ {p.likes}</button>
               <span>👀 {p.views}</span>
-
             </div>
 
           </div>
@@ -184,16 +172,14 @@ export default function Home(){
 
       </div>
 
-      {/* 右（固定） */}
+      {/* 右 */}
       <div className="w-[250px] p-4 fixed right-0 top-0 h-screen">
-
         <div className="bg-white p-4 rounded-xl">
           <h2 className="font-bold mb-2">🔥 トレンド</h2>
           <p>AI</p>
           <p>ゲーム</p>
           <p>マイクラ</p>
         </div>
-
       </div>
 
     </main>
