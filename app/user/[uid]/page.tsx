@@ -2,47 +2,92 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  onSnapshot
+} from "firebase/firestore";
 import { useParams } from "next/navigation";
 
 export default function Profile() {
-  const { uid } = useParams();
-  const [data,setData]=useState<any>(null);
-  const [posts,setPosts]=useState<any[]>([]);
+  const params = useParams();
+  const uid = params?.uid as string;
 
-  useEffect(()=>{
-    if(!uid) return;
+  const [data, setData] = useState<any>(null);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    getDoc(doc(db,"users",uid as string))
-      .then(d=>{
-        if(d.exists()) setData(d.data());
-        else setData({username:"なし"});
+  useEffect(() => {
+    if (!uid) return;
+
+    // ユーザー取得
+    getDoc(doc(db, "users", uid))
+      .then((d) => {
+        if (d.exists()) {
+          setData(d.data());
+        } else {
+          setData({ username: "unknown" });
+        }
+      })
+      .catch(() => {
+        setData({ username: "error" });
       });
 
-    const q=query(collection(db,"posts"),where("uid","==",uid));
-    return onSnapshot(q,s=>setPosts(s.docs.map(d=>d.data())));
-  },[uid]);
+    // 投稿取得
+    const q = query(collection(db, "posts"), where("uid", "==", uid));
 
-  if(!data) return <div>読み込み中</div>;
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map((d) => d.data());
+      setPosts(list);
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, [uid]);
+
+  // ロード失敗対策
+  if (loading) {
+    return (
+      <div className="p-10 text-center">
+        読み込み中...
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white min-h-screen">
 
+      {/* ヘッダー */}
       <div className="h-40 bg-gray-300"></div>
 
-      <div className="w-24 h-24 bg-gray-400 rounded-full -mt-12 ml-4"></div>
+      {/* アイコン */}
+      <div className="w-24 h-24 bg-gray-400 rounded-full -mt-12 ml-4 border-4 border-white"></div>
 
+      {/* 情報 */}
       <div className="p-4">
-        <h1 className="text-xl font-bold">{data.username}</h1>
+        <h1 className="text-xl font-bold">
+          {data?.username || "unknown"}
+        </h1>
 
-        <div className="mt-4 border-t pt-2">
-          {posts.map((p,i)=>(
-            <div key={i} className="border-b p-2">
-              {p.text}
-            </div>
-          ))}
+        <p className="text-gray-500">@{data?.username}</p>
+
+        {/* 投稿一覧 */}
+        <div className="mt-6 border-t">
+          {posts.length === 0 ? (
+            <p className="p-4 text-gray-400">
+              まだ投稿がありません
+            </p>
+          ) : (
+            posts.map((p, i) => (
+              <div key={i} className="border-b p-4">
+                {p.text}
+              </div>
+            ))
+          )}
         </div>
-
       </div>
 
     </div>
