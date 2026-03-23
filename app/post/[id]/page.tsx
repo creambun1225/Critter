@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { db, auth } from "@/lib/firebase";
 import {
   doc,
@@ -13,48 +13,74 @@ import {
 } from "firebase/firestore";
 import { useParams } from "next/navigation";
 
-export default function PostPage() {
+export default function PostDetail() {
   const { id } = useParams();
-  const [post, setPost] = useState<any>(null);
-  const [replies, setReplies] = useState<any[]>([]);
-  const [text, setText] = useState("");
-  const [user, setUser] = useState<any>(null);
+  const [post,setPost]=useState<any>(null);
+  const [replies,setReplies]=useState<any[]>([]);
+  const [text,setText]=useState("");
+  const [user,setUser]=useState<any>(null);
 
   useEffect(()=>{
-    auth.onAuthStateChanged(setUser);
+    const u = auth.currentUser;
+    if(!u) window.location.href="/login";
+    else setUser(u);
   },[]);
 
   useEffect(()=>{
-    getDoc(doc(db,"posts",id as string)).then(d=>setPost(d.data()));
+    if(!id) return;
 
-    const q = query(collection(db,"replies"), where("postId","==",id));
-    return onSnapshot(q,s=>setReplies(s.docs.map(d=>d.data())));
+    getDoc(doc(db,"posts",id as string))
+      .then(d=>setPost(d.data()));
+
+    const q=query(collection(db,"replies"),where("postId","==",id));
+    return onSnapshot(q,s=>{
+      setReplies(s.docs.map(d=>d.data()));
+    });
+
   },[id]);
 
-  const send = async ()=>{
+  const sendReply = async ()=>{
+    if(!text) return;
+
     await addDoc(collection(db,"replies"),{
       text,
       postId:id,
-      username:user.email.split("@")[0]
+      uid:user.uid
     });
+
     setText("");
   };
 
-  if(!post) return null;
+  if(!post) return <div>読み込み中...</div>;
 
   return (
-    <div className="p-4">
-      <h1>{post.username}</h1>
+    <div className="bg-white min-h-screen p-4">
+
+      <h1 className="font-bold">{post.username}</h1>
       <p>{post.text}</p>
 
-      <textarea onChange={(e)=>setText(e.target.value)} />
-      <button onClick={send}>返信</button>
+      <div className="mt-4">
+        <textarea
+          className="border w-full p-2"
+          value={text}
+          onChange={(e)=>setText(e.target.value)}
+        />
+        <button
+          onClick={sendReply}
+          className="bg-blue-500 text-white px-4 py-1 mt-2"
+        >
+          返信
+        </button>
+      </div>
 
-      {replies.map((r,i)=>(
-        <div key={i}>
-          <b>{r.username}</b> {r.text}
-        </div>
-      ))}
+      <div className="mt-6">
+        {replies.map((r,i)=>(
+          <div key={i} className="border-b p-2">
+            {r.text}
+          </div>
+        ))}
+      </div>
+
     </div>
   );
 }

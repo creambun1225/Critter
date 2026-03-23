@@ -24,7 +24,7 @@ export default function Home() {
   const [bookmarks, setBookmarks] = useState<any>({});
   const [trends, setTrends] = useState<string[]>([]);
 
-  // 🔥 右クリックで設定
+  // 右クリックで設定
   useEffect(() => {
     const handler = (e:any) => {
       e.preventDefault();
@@ -68,6 +68,18 @@ export default function Home() {
     else await setDoc(ref, { uid: user.uid, postId });
   };
 
+  // 🔥フォロー機能
+  const followUser = async (targetUid:string)=>{
+    if(!user) return;
+
+    await addDoc(collection(db,"follows"),{
+      from:user.uid,
+      to:targetUid
+    });
+
+    alert("フォローしました");
+  };
+
   // 状態取得
   useEffect(() => {
     if (!user) return;
@@ -96,7 +108,7 @@ export default function Home() {
     };
   }, [user]);
 
-  // 🔥トレンド
+  // トレンド
   useEffect(() => {
     const words:any = {};
 
@@ -136,14 +148,12 @@ export default function Home() {
             <Link href="/settings">⚙️ 設定</Link>
           </div>
 
-          {/* 🔥 ログアウト */}
           <button
             onClick={() => signOut(auth)}
             className="mt-10 text-red-500 text-lg"
           >
             ログアウト
           </button>
-
         </div>
 
         <button
@@ -171,16 +181,30 @@ export default function Home() {
         {posts.map(p => (
           <div key={p.id} className="p-4 border-b hover:bg-gray-50">
 
-            <Link href={`/user/${p.uid}`}>
-              <p className="font-bold text-sm hover:underline">
-                {p.username}
-              </p>
-            </Link>
+            {/* 名前＋フォロー */}
+            <div className="flex items-center">
+              <Link href={`/user/${p.uid}`}>
+                <p className="font-bold text-sm hover:underline">
+                  {p.username}
+                </p>
+              </Link>
 
+              {p.uid !== user.uid && (
+                <button
+                  onClick={()=>followUser(p.uid)}
+                  className="text-blue-500 text-sm ml-2"
+                >
+                  フォロー
+                </button>
+              )}
+            </div>
+
+            {/* 本文 */}
             <Link href={`/post/${p.id}`}>
               <p className="mt-1 text-[15px]">{p.text}</p>
             </Link>
 
+            {/* アクション */}
             <div className="flex justify-between mt-3 text-sm text-gray-500">
 
               <button onClick={()=>toggleLike(p.id)}>
