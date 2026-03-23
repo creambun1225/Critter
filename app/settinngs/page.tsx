@@ -1,81 +1,85 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { db, auth } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { useState } from "react";
 
 export default function Settings() {
-  const [username, setUsername] = useState("");
+
+  const [username, setUsername] = useState("creambun");
+  const [displayName, setDisplayName] = useState("creambun");
   const [bio, setBio] = useState("");
-  const [icon, setIcon] = useState("");
-  const [header, setHeader] = useState("");
-
-  useEffect(() => {
-    const u = auth.currentUser;
-    if (!u) return;
-
-    getDoc(doc(db, "users", u.uid)).then((res) => {
-      const d = res.data();
-      setUsername(d?.username || "");
-      setBio(d?.bio || "");
-      setIcon(d?.icon || "");
-      setHeader(d?.header || "");
-    });
-  }, []);
-
-  const save = async () => {
-    const u = auth.currentUser;
-    if (!u) return;
-
-    await setDoc(doc(db, "users", u.uid), {
-      username,
-      bio,
-      icon,
-      header,
-    }, { merge: true });
-
-    alert("保存した！");
-  };
 
   return (
-    <div className="max-w-[600px] mx-auto p-4">
+    <div className="flex bg-gray-100 min-h-screen">
 
-      <h1 className="text-xl font-bold mb-4">プロフィール編集</h1>
+      {/* 左 */}
+      <div className="w-[250px] p-6 border-r bg-white">
+        <h1 className="text-xl font-bold mb-6">設定</h1>
 
-      <input
-        placeholder="表示名"
-        className="border p-2 w-full mb-2"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
+        <div className="flex flex-col gap-4 text-gray-600">
+          <div className="bg-blue-100 p-2 rounded">プロフィール</div>
+          <div>表示</div>
+          <div>アカウント</div>
+          <div>パスワード</div>
+          <div>APIキー</div>
+          <div>プライバシー</div>
+          <div>通知</div>
+          <div>通話</div>
+          <div>法務</div>
+          <div>クレジット</div>
+        </div>
+      </div>
 
-      <textarea
-        placeholder="自己紹介"
-        className="border p-2 w-full mb-2"
-        value={bio}
-        onChange={(e) => setBio(e.target.value)}
-      />
+      {/* 右 */}
+      <div className="flex-1 p-10">
 
-      <input
-        placeholder="アイコンURL"
-        className="border p-2 w-full mb-2"
-        value={icon}
-        onChange={(e) => setIcon(e.target.value)}
-      />
+        <h1 className="text-2xl font-bold mb-6">プロフィール設定</h1>
 
-      <input
-        placeholder="ヘッダーURL"
-        className="border p-2 w-full mb-2"
-        value={header}
-        onChange={(e) => setHeader(e.target.value)}
-      />
+        <div className="mb-6">
+          <p>プロフィール画像</p>
+          <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
+            画像なし
+          </div>
+        </div>
 
-      <button
-        onClick={save}
-        className="bg-blue-500 text-white px-4 py-2 rounded"
-      >
-        保存
-      </button>
+        <div className="mb-6">
+          <p>ヘッダー画像</p>
+          <div className="h-32 bg-gray-200 flex items-center justify-center rounded">
+            画像なし
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <p>ユーザー名</p>
+          <input
+            className="border p-2 w-full rounded"
+            value={username}
+            onChange={(e)=>setUsername(e.target.value)}
+          />
+          <button className="bg-blue-500 text-white px-4 py-2 rounded mt-2">
+            変更
+          </button>
+        </div>
+
+        <div className="mb-4">
+          <p>表示名</p>
+          <input
+            className="border p-2 w-full rounded"
+            value={displayName}
+            onChange={(e)=>setDisplayName(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <p>自己紹介</p>
+          <textarea
+            className="border p-2 w-full rounded"
+            value={bio}
+            onChange={(e)=>setBio(e.target.value)}
+          />
+        </div>
+
+      </div>
+
     </div>
   );
 }
