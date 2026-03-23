@@ -11,13 +11,12 @@ import {
   orderBy,
   doc,
   getDoc,
-  updateDoc,
+  runTransaction,
   deleteDoc
 } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 
-// 🔥 これ追加
-const VERSION = "v1.0.0";
+const VERSION = "v1.1.0";
 
 export default function Home(){
 
@@ -25,7 +24,9 @@ export default function Home(){
   const [userData,setUserData]=useState<any>(null);
   const [text,setText]=useState("");
   const [posts,setPosts]=useState<any[]>([]);
+  const [menuOpen,setMenuOpen]=useState<string | null>(null);
 
+  // ログイン
   useEffect(()=>{
     return onAuthStateChanged(auth,(u)=>{
       if(!u) window.location.href="/login";
@@ -33,6 +34,7 @@ export default function Home(){
     });
   },[]);
 
+  // ユーザー
   useEffect(()=>{
     if(!user) return;
     getDoc(doc(db,"users",user.uid)).then(d=>{
@@ -40,19 +42,16 @@ export default function Home(){
     });
   },[user]);
 
+  // 投稿取得
   useEffect(()=>{
     const q=query(collection(db,"posts"),orderBy("createdAt","desc"));
-
     const unsub=onSnapshot(q,(snap)=>{
-      setPosts(snap.docs.map(d=>({
-        id:d.id,
-        ...d.data()
-      })));
+      setPosts(snap.docs.map(d=>({id:d.id,...d.data()})));
     });
-
     return ()=>unsub();
   },[]);
 
+  // 投稿
   const post=async()=>{
     if(!text) return;
 
@@ -62,39 +61,46 @@ export default function Home(){
       username:userData?.username || "unknown",
       createdAt:Date.now(),
       likes:0,
-      replies:0,
       reposts:0,
+      replies:0,
       views:0
     });
 
     setText("");
   };
 
+  // 🔥 いいね（確実に増える）
   const like=async(p:any)=>{
-    await updateDoc(doc(db,"posts",p.id),{
-      likes:(p.likes||0)+1
+    const ref = doc(db,"posts",p.id);
+    await runTransaction(db, async (tx)=>{
+      const snap = await tx.get(ref);
+      const newLikes = (snap.data()?.likes || 0) + 1;
+      tx.update(ref,{likes:newLikes});
     });
   };
 
+  // 🔁 リポスト
   const repost=async(p:any)=>{
-    await updateDoc(doc(db,"posts",p.id),{
-      reposts:(p.reposts||0)+1
+    const ref = doc(db,"posts",p.id);
+    await runTransaction(db, async (tx)=>{
+      const snap = await tx.get(ref);
+      const newVal = (snap.data()?.reposts || 0) + 1;
+      tx.update(ref,{reposts:newVal});
     });
   };
 
+  // 🗑 削除
   const remove=async(id:string)=>{
-    if(confirm("削除する？")){
-      await deleteDoc(doc(db,"posts",id));
-    }
+    await deleteDoc(doc(db,"posts",id));
   };
 
   if(!user) return <div>loading...</div>;
 
   return (
-    <main className="flex justify-center bg-[#f5f8fa] h-screen">
+    <main className="flex bg-[#f5f8fa] h-screen">
 
-      {/* 左 */}
-      <div className="w-[250px] p-6 border-r flex flex-col justify-between fixed left-0 top-0 h-screen bg-white">
+      {/* 左（完全固定） */}
+      <div className="w-[250px] fixed left-0 top-0 h-screen flex flex-col justify-between p-6 border-r bg-white">
 
         <div>
           <h1 className="text-3xl font-bold text-blue-500 mb-8">Critter</h1>
@@ -108,16 +114,15 @@ export default function Home(){
           </div>
         </div>
 
-        {/* ＋クリート */}
         <div>
+          {/* ＋クリート（固定） */}
           <button
             onClick={()=>window.scrollTo({top:0})}
-            className="bg-blue-500 text-white rounded-full py-3 w-full"
+            className="bg-blue-500 text-white w-full py-3 rounded-full"
           >
             ＋クリート
           </button>
 
-          {/* 🔥 バージョン表示 */}
           <p className="text-gray-400 text-sm mt-4 text-center">
             {VERSION}
           </p>
@@ -125,39 +130,46 @@ export default function Home(){
 
       </div>
 
-      {/* 真ん中 */}
-      <div className="w-[600px] ml-[250px] mr-[250px] overflow-y-scroll h-screen bg-white">
+      {/* 真ん中（スクロール） */}
+      <div className="ml-[250px] mr-[250px] w-[600px] overflow-y-scroll h-screen bg-white">
 
+        {/* 投稿欄 */}
         <div className="p-4 border-b">
           <textarea
             className="w-full border p-2"
             value={text}
             onChange={(e)=>setText(e.target.value)}
           />
-          <button
-            onClick={post}
-            className="bg-blue-500 text-white px-4 py-1 rounded mt-2"
-          >
+          <button onClick={post} className="bg-blue-500 text-white px-4 py-1 mt-2 rounded">
             ポスト
           </button>
         </div>
 
+        {/* 投稿 */}
         {posts.map((p)=>(
           <div key={p.id} className="border-b p-4 relative">
 
+            {/* ・・・メニュー */}
             {p.uid===user.uid && (
-              <button
-                onClick={()=>remove(p.id)}
-                className="absolute right-2 top-2 text-gray-400"
-              >
-                ⋮
-              </button>
+              <div className="absolute right-2 top-2">
+                <button onClick={()=>setMenuOpen(menuOpen===p.id?null:p.id)}>
+                  ⋮
+                </button>
+
+                {menuOpen===p.id && (
+                  <div className="bg-white border shadow p-2 absolute right-0">
+                    <button
+                      onClick={()=>remove(p.id)}
+                      className="text-red-500"
+                    >
+                      削除
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
-            <Link href={`/user/${p.uid}`}>
-              <p className="font-bold">{p.username}</p>
-            </Link>
-
+            <p className="font-bold">{p.username}</p>
             <p>{p.text}</p>
 
             <div className="flex gap-6 mt-2 text-gray-500">
@@ -172,14 +184,16 @@ export default function Home(){
 
       </div>
 
-      {/* 右 */}
-      <div className="w-[250px] p-4 fixed right-0 top-0 h-screen">
+      {/* 右（固定） */}
+      <div className="w-[250px] fixed right-0 top-0 h-screen p-4">
+
         <div className="bg-white p-4 rounded-xl">
           <h2 className="font-bold mb-2">🔥 トレンド</h2>
           <p>AI</p>
           <p>ゲーム</p>
           <p>マイクラ</p>
         </div>
+
       </div>
 
     </main>
