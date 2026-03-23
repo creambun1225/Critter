@@ -1,131 +1,92 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { db, auth } from "@/lib/firebase";
 import {
-  doc,
-  getDoc,
   collection,
+  addDoc,
   query,
-  where,
+  orderBy,
   onSnapshot
 } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 
-export default function Profile(){
-
-  const [user,setUser]=useState<any>(null);
-  const [data,setData]=useState<any>(null);
-  const [posts,setPosts]=useState<any[]>([]);
-  const [trends,setTrends]=useState<string[]>([]);
+export default function Home() {
+  const [posts, setPosts] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
 
   // ログインチェック
-  useEffect(()=>{
-    return onAuthStateChanged(auth,(u)=>{
-      if(!u) window.location.href="/login";
+  useEffect(() => {
+    return onAuthStateChanged(auth, (u) => {
+      if (!u) window.location.href = "/login";
       else setUser(u);
     });
-  },[]);
+  }, []);
 
-  // データ取得
-  useEffect(()=>{
-    if(!user) return;
-
-    // ユーザー
-    getDoc(doc(db,"users",user.uid))
-      .then(d=>setData(d.data()));
-
-    // 投稿
-    const q=query(collection(db,"posts"),where("uid","==",user.uid));
-    const unsub=onSnapshot(q,s=>{
-      const list=s.docs.map(d=>d.data());
-      setPosts(list);
-
-      // 🔥トレンド生成
-      const words:any={};
-      list.forEach((p:any)=>{
-        if(!p.text) return;
-        p.text.split(/[\s　]+/).forEach((w:string)=>{
-          if(w.length<2) return;
-          words[w]=(words[w]||0)+1;
-        });
-      });
-
-      const sorted=Object.entries(words)
-        .sort((a:any,b:any)=>b[1]-a[1])
-        .slice(0,5)
-        .map((w:any)=>w[0]);
-
-      setTrends(sorted);
+  // 投稿取得
+  useEffect(() => {
+    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+    return onSnapshot(q, (snap) => {
+      setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
+  }, []);
 
-    return ()=>unsub();
+  // 投稿
+  const createPost = async () => {
+    const text = prompt("投稿内容");
+    if (!text || !user) return;
 
-  },[user]);
+    await addDoc(collection(db, "posts"), {
+      text,
+      createdAt: Date.now(),
+      uid: user.uid
+    });
+  };
 
-  if(!user || !data) return <div>読み込み中...</div>;
+  if (!user) return null;
 
   return (
     <main className="flex justify-center bg-[#f5f8fa] min-h-screen">
 
-      {/* 左メニュー（ホームと同じ） */}
-      <div className="w-[250px] p-6 border-r flex flex-col justify-between">
+      {/* 左メニュー */}
+      <div className="w-[250px] p-6 border-r">
+        <h1 className="text-2xl font-bold mb-6">Critter</h1>
 
-        <div>
-          <h1 className="text-3xl font-bold text-blue-500 mb-8">Critter</h1>
-
-          <div className="flex flex-col gap-7 text-xl font-medium">
-            <Link href="/">🏠 ホーム</Link>
-            <Link href="/notifications">🔔 通知</Link>
-            <Link href="/profile">👤 プロフィール</Link>
-            <Link href="/bookmarks">🔖 ブックマーク</Link>
-            <Link href="/settings">⚙️ 設定</Link>
-          </div>
-
-          <button
-            onClick={()=>signOut(auth)}
-            className="mt-10 text-red-500"
-          >
-            ログアウト
-          </button>
+        <div className="flex flex-col gap-6 text-lg">
+          <Link href="/">🏠 ホーム</Link>
+          <Link href="/profile">👤 プロフィール</Link>
         </div>
 
+        <button
+          onClick={createPost}
+          className="mt-6 bg-blue-500 text-white p-2 rounded"
+        >
+          ＋ 投稿
+        </button>
       </div>
 
-      {/* 🔥 真ん中＝プロフィール */}
+      {/* タイムライン */}
       <div className="w-[600px] bg-white border-x">
 
-        {/* ヘッダー */}
-        <div className="h-40 bg-gray-300"></div>
+        {posts.map(p => (
+          <div key={p.id} className="p-4 border-b">
+            <Link href={`/user/${p.uid}`}>
+              <p className="font-bold">{p.username || "unknown"}</p>
+            </Link>
 
-        {/* アイコン */}
-        <div className="w-24 h-24 bg-gray-400 rounded-full -mt-12 ml-4 border-4 border-white"></div>
-
-        {/* 情報 */}
-        <div className="p-4">
-          <h1 className="text-xl font-bold">{data.username}</h1>
-          <p className="text-gray-500">@{data.username}</p>
-        </div>
-
-        {/* 投稿 */}
-        <div className="border-t">
-          {posts.length===0 && <p className="p-4">投稿なし</p>}
-
-          {posts.map((p,i)=>(
-            <div key={i} className="border-b p-4">
-              {p.text}
-            </div>
-          ))}
-        </div>
+            <Link href={`/post/${p.id}`}>
+              <p>{p.text}</p>
+            </Link>
+          </div>
+        ))}
 
       </div>
 
-      {/* 右＝トレンド */}
+      {/* 右 */}
       <div className="w-[250px] p-4">
-        <div className="bg-white p-4 rounded-xl">
-          <h2 className="font-bold mb-2">🔥 トレンド</h2>
-          {trends.map((t,i)=><p key={i}>{t}</p>)}
+        <div className="bg-white p-4 rounded">
+          トレンド
         </div>
       </div>
 
