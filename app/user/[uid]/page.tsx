@@ -1,45 +1,85 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  setDoc,
+  deleteDoc
+} from "firebase/firestore";
 import { useParams } from "next/navigation";
 
-export default function UserProfile() {
-  const params = useParams();
-  const uid = params?.uid as string;
+export default function Profile() {
+  const { uid } = useParams();
+  const [data,setData]=useState<any>({});
+  const [posts,setPosts]=useState<any[]>([]);
+  const [me,setMe]=useState<any>(null);
+  const [following,setFollowing]=useState(false);
 
-  const [data, setData] = useState<any>(null);
-  const [posts, setPosts] = useState<any[]>([]);
+  useEffect(()=>{
+    auth.onAuthStateChanged(setMe);
+  },[]);
 
-  useEffect(() => {
-    if (!uid) return;
+  useEffect(()=>{
+    if(!uid) return;
 
-    const load = async () => {
-      const d = await getDoc(doc(db, "users", uid));
-      if (d.exists()) setData(d.data());
-    };
+    getDoc(doc(db,"users",uid as string)).then(d=>setData(d.data()));
 
-    load();
+    const q=query(collection(db,"posts"),where("uid","==",uid));
+    return onSnapshot(q,s=>setPosts(s.docs.map(d=>d.data())));
+  },[uid]);
 
-    const q = query(collection(db, "posts"), where("uid", "==", uid));
-    const unsub = onSnapshot(q, (snap) => {
-      setPosts(snap.docs.map(d => d.data()));
-    });
+  // フォロー
+  useEffect(()=>{
+    if(!me) return;
 
-    return () => unsub();
-  }, [uid]);
+    const ref=doc(db,"follows",me.uid+"_"+uid);
+    getDoc(ref).then(d=>setFollowing(d.exists()));
+  },[me,uid]);
 
-  if (!data) return <div className="p-4">読み込み中...</div>;
+  const toggleFollow=async()=>{
+    const ref=doc(db,"follows",me.uid+"_"+uid);
+    if(following){
+      await deleteDoc(ref);
+      setFollowing(false);
+    }else{
+      await setDoc(ref,{from:me.uid,to:uid});
+      setFollowing(true);
+    }
+  };
 
   return (
-    <div className="p-4">
-      <h1>{data.username}</h1>
-      <p>{data.bio}</p>
+    <div>
 
-      {posts.map((p,i)=>(
-        <div key={i} className="border p-2">{p.text}</div>
-      ))}
+      {/* ヘッダー */}
+      <div className="h-40 bg-gray-300"></div>
+
+      {/* アイコン */}
+      <div className="w-24 h-24 bg-gray-400 rounded-full -mt-12 ml-4"></div>
+
+      <div className="p-4">
+
+        <h1 className="text-xl font-bold">{data?.username}</h1>
+
+        <button onClick={toggleFollow} className="border px-3 py-1">
+          {following ? "フォロー中" : "フォロー"}
+        </button>
+
+        <p className="mt-2">{data?.bio}</p>
+
+        {/* 投稿 */}
+        {posts.map((p,i)=>(
+          <div key={i} className="border-b p-2">
+            {p.text}
+          </div>
+        ))}
+
+      </div>
     </div>
   );
 }
