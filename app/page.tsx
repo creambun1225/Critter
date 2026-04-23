@@ -11,19 +11,37 @@ import {
   orderBy,
   doc,
   getDoc,
+  updateDoc,
   runTransaction,
-  deleteDoc
+  deleteDoc,
+  arrayUnion
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+
+/* 型 */
+type Post = {
+  id: string;
+  uid: string;
+  username: string;
+  text: string;
+  image?: string;
+  createdAt: number;
+  likes: number;
+  reposts: number;
+  replies: number;
+  views: number;
+};
 
 export default function Home(){
 
   const [user,setUser]=useState<any>(null);
   const [userData,setUserData]=useState<any>(null);
+
   const [text,setText]=useState("");
-  const [posts,setPosts]=useState<any[]>([]);
-  const [menuOpen,setMenuOpen]=useState<string | null>(null);
-  const [open,setOpen]=useState(false); // ← モーダル
+  const [image,setImage]=useState("");
+  const [posts,setPosts]=useState<Post[]>([]);
+  const [open,setOpen]=useState(false);
+  const [trends,setTrends]=useState<any[]>([]);
 
   // ログイン
   useEffect(()=>{
@@ -36,24 +54,71 @@ export default function Home(){
   // ユーザー情報
   useEffect(()=>{
     if(!user) return;
-    getDoc(doc(db,"users",user.uid)).then(d=>{
+
+    getDoc(doc(db,"users",user.uid)).then(async d=>{
+      if(!d.exists()){
+        await updateDoc(doc(db,"users",user.uid),{
+          username:"user",
+          followers:[],
+          following:[]
+        });
+      }
       setUserData(d.data());
     });
   },[user]);
 
   // 投稿取得
   useEffect(()=>{
+    if(!userData) return;
+
     const q=query(collection(db,"posts"),orderBy("createdAt","desc"));
 
     const unsub=onSnapshot(q,(snap)=>{
-      setPosts(snap.docs.map(d=>({
-        id:d.id,
-        ...d.data()
-      })));
+
+      let list:Post[] = snap.docs.map((d:any)=>{
+        const data = d.data() as any;
+
+        return {
+          id: d.id || "",
+          uid: data.uid || "",
+          username: data.username || "unknown",
+          text: data.text || "",
+          image: data.image || "",
+          createdAt: data.createdAt || 0,
+          likes: data.likes || 0,
+          reposts: data.reposts || 0,
+          replies: data.replies || 0,
+          views: data.views || 0
+        };
+      });
+
+      // フォローTL
+      list = list.filter(p =>
+        userData.following?.includes(p.uid) || p.uid === user.uid
+      );
+
+      setPosts(list);
+
+      // トレンド
+      const texts = list.slice(0,100).map(p=>p.text);
+      const words:any = {};
+
+      texts.forEach(t=>{
+        t.split(/\s+/).forEach((w:string)=>{
+          if(!w || w.length<=1) return;
+          words[w]=(words[w]||0)+1;
+        });
+      });
+
+      const sorted = Object.entries(words)
+        .sort((a:any,b:any)=>b[1]-a[1])
+        .slice(0,5);
+
+      setTrends(sorted);
     });
 
     return ()=>unsub();
-  },[]);
+  },[userData]);
 
   // 投稿
   const post=async()=>{
@@ -61,6 +126,7 @@ export default function Home(){
 
     await addDoc(collection(db,"posts"),{
       text,
+      image,
       uid:user.uid,
       username:userData?.username || "unknown",
       createdAt:Date.now(),
@@ -71,33 +137,37 @@ export default function Home(){
     });
 
     setText("");
+    setImage("");
   };
 
   // いいね
-  const like=async(p:any)=>{
-    const ref = doc(db,"posts",p.id);
-
-    await runTransaction(db, async (tx)=>{
-      const snap = await tx.get(ref);
-      const current = snap.data()?.likes || 0;
-
-      tx.update(ref,{
-        likes: current + 1
-      });
+  const like=async(p:Post)=>{
+    const ref=doc(db,"posts",p.id);
+    await runTransaction(db,async(tx)=>{
+      const snap=await tx.get(ref);
+      const current=snap.data()?.likes||0;
+      tx.update(ref,{likes:current+1});
     });
   };
 
   // リポスト
-  const repost=async(p:any)=>{
-    const ref = doc(db,"posts",p.id);
+  const repost=async(p:Post)=>{
+    const ref=doc(db,"posts",p.id);
+    await runTransaction(db,async(tx)=>{
+      const snap=await tx.get(ref);
+      const current=snap.data()?.reposts||0;
+      tx.update(ref,{reposts:current+1});
+    });
+  };
 
-    await runTransaction(db, async (tx)=>{
-      const snap = await tx.get(ref);
-      const current = snap.data()?.reposts || 0;
+  // フォロー
+  const follow=async(targetId:string)=>{
+    await updateDoc(doc(db,"users",user.uid),{
+      following:arrayUnion(targetId)
+    });
 
-      tx.update(ref,{
-        reposts: current + 1
-      });
+    await updateDoc(doc(db,"users",targetId),{
+      followers:arrayUnion(user.uid)
     });
   };
 
@@ -117,9 +187,9 @@ export default function Home(){
       <div className="w-[250px] fixed left-0 top-0 h-screen flex flex-col justify-between p-6 border-r bg-white">
 
         <div>
-          <h1 className="text-3xl font-bold text-blue-500 mb-8">Critter</h1>
+          <h1 className="text-3xl font-bold text-blue-500 mb-10">Critter</h1>
 
-          <div className="flex flex-col gap-7 text-xl">
+          <div className="flex flex-col gap-8 text-xl">
             <Link href="/">🏠 ホーム</Link>
             <Link href="/notifications">🔔 通知</Link>
             <Link href="/profile">👤 プロフィール</Link>
@@ -128,66 +198,51 @@ export default function Home(){
           </div>
         </div>
 
-        {/* ＋クリート */}
         <button
           onClick={()=>setOpen(true)}
-          className="bg-blue-500 text-white w-full py-3 rounded-full"
+          className="bg-blue-500 text-white py-3 rounded-full text-lg"
         >
           ＋クリート
         </button>
-
       </div>
 
       {/* 真ん中 */}
       <div className="w-[600px] ml-[250px] mr-[250px] overflow-y-scroll h-screen bg-white">
 
-        {/* ❌ 上の投稿欄は削除済み */}
-
-        {/* 投稿一覧 */}
         {posts.map((p)=>(
           <div key={p.id} className="border-b p-4 relative">
 
-            {/* メニュー */}
             {p.uid===user.uid && (
-              <div className="absolute right-2 top-2">
-                <button onClick={()=>setMenuOpen(menuOpen===p.id?null:p.id)}>
-                  ⋮
-                </button>
-
-                {menuOpen===p.id && (
-                  <div className="bg-white border shadow p-2 absolute right-0">
-                    <button
-                      onClick={()=>remove(p.id)}
-                      className="text-red-500"
-                    >
-                      削除
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button onClick={()=>remove(p.id)} className="absolute right-2 top-2">
+                ⋮
+              </button>
             )}
 
-            {/* 名前 */}
-            <p className="font-bold">{p.username}</p>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
+              <p className="font-bold">{p.username}</p>
 
-            {/* 本文 */}
-            <p>{p.text}</p>
+              {p.uid!==user.uid && (
+                <button
+                  onClick={()=>follow(p.uid)}
+                  className="ml-2 text-blue-500"
+                >
+                  フォロー
+                </button>
+              )}
+            </div>
 
-            {/* アクション */}
-            <div className="flex gap-6 mt-2 text-gray-500">
+            <p className="mt-2">{p.text}</p>
 
-              <span>💬 {p.replies || 0}</span>
+            {p.image && (
+              <img src={p.image} className="mt-2 rounded-xl" />
+            )}
 
-              <button onClick={()=>repost(p)}>
-                🔁 {p.reposts || 0}
-              </button>
-
-              <button onClick={()=>like(p)}>
-                ❤️ {p.likes || 0}
-              </button>
-
-              <span>👀 {p.views || 0}</span>
-
+            <div className="flex gap-6 mt-3 text-gray-500">
+              <span>💬 {p.replies}</span>
+              <button onClick={()=>repost(p)}>🔁 {p.reposts}</button>
+              <button onClick={()=>like(p)}>❤️ {p.likes}</button>
+              <span>👀 {p.views}</span>
             </div>
 
           </div>
@@ -197,25 +252,22 @@ export default function Home(){
 
       {/* 右 */}
       <div className="w-[250px] fixed right-0 top-0 h-screen p-4">
-
         <div className="bg-white p-4 rounded-xl">
-          <h2 className="font-bold mb-2">🔥 トレンド</h2>
-          <p>AI</p>
-          <p>ゲーム</p>
-          <p>マイクラ</p>
+          <h2 className="font-bold mb-3">🔥 トレンド</h2>
+          {trends.map((t:any,i)=>(
+            <p key={i}>{t[0]}（{t[1]}件）</p>
+          ))}
         </div>
-
       </div>
 
-      {/* 🔥 投稿モーダル */}
+      {/* モーダル */}
       {open && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start pt-20 z-50">
-
+        <div className="fixed inset-0 bg-black bg-opacity-20 flex justify-center items-start pt-20 z-50">
           <div className="bg-white w-[500px] rounded-xl p-4">
 
-            <div className="flex justify-between mb-4">
+            <div className="flex items-center gap-3 mb-4">
               <button onClick={()=>setOpen(false)}>✖</button>
-              <span className="text-blue-500">下書き</span>
+              <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
             </div>
 
             <textarea
@@ -225,22 +277,21 @@ export default function Home(){
               onChange={(e)=>setText(e.target.value)}
             />
 
-            <div className="flex justify-between items-center mt-4">
+            <input
+              type="text"
+              placeholder="画像URL"
+              className="w-full border p-2 mt-2"
+              value={image}
+              onChange={(e)=>setImage(e.target.value)}
+            />
 
-              <div className="flex gap-4 text-blue-500">
-                📷 😊 📍
-              </div>
-
+            <div className="flex justify-end mt-4">
               <button
-                onClick={()=>{
-                  post();
-                  setOpen(false);
-                }}
+                onClick={()=>{post();setOpen(false);}}
                 className="bg-blue-500 text-white px-4 py-2 rounded-full"
               >
                 ポストする
               </button>
-
             </div>
 
           </div>
