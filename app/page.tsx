@@ -14,7 +14,7 @@ import {
   runTransaction,
   deleteDoc
 } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function Home(){
 
@@ -23,6 +23,7 @@ export default function Home(){
   const [text,setText]=useState("");
   const [posts,setPosts]=useState<any[]>([]);
   const [menuOpen,setMenuOpen]=useState<string | null>(null);
+  const [open,setOpen]=useState(false); // ← モーダル
 
   // ログイン
   useEffect(()=>{
@@ -40,7 +41,7 @@ export default function Home(){
     });
   },[user]);
 
-  // 投稿取得（リアルタイム）
+  // 投稿取得
   useEffect(()=>{
     const q=query(collection(db,"posts"),orderBy("createdAt","desc"));
 
@@ -72,7 +73,7 @@ export default function Home(){
     setText("");
   };
 
-  // ❤️ いいね（確実に増える）
+  // いいね
   const like=async(p:any)=>{
     const ref = doc(db,"posts",p.id);
 
@@ -86,7 +87,7 @@ export default function Home(){
     });
   };
 
-  // 🔁 リポスト
+  // リポスト
   const repost=async(p:any)=>{
     const ref = doc(db,"posts",p.id);
 
@@ -100,7 +101,7 @@ export default function Home(){
     });
   };
 
-  // 🗑 削除
+  // 削除
   const remove=async(id:string)=>{
     if(confirm("削除する？")){
       await deleteDoc(doc(db,"posts",id));
@@ -112,7 +113,7 @@ export default function Home(){
   return (
     <main className="flex justify-center bg-[#f5f8fa] h-screen">
 
-      {/* 左メニュー（固定） */}
+      {/* 左 */}
       <div className="w-[250px] fixed left-0 top-0 h-screen flex flex-col justify-between p-6 border-r bg-white">
 
         <div>
@@ -129,7 +130,7 @@ export default function Home(){
 
         {/* ＋クリート */}
         <button
-          onClick={()=>window.scrollTo({top:0})}
+          onClick={()=>setOpen(true)}
           className="bg-blue-500 text-white w-full py-3 rounded-full"
         >
           ＋クリート
@@ -137,30 +138,16 @@ export default function Home(){
 
       </div>
 
-      {/* 真ん中（スクロール） */}
+      {/* 真ん中 */}
       <div className="w-[600px] ml-[250px] mr-[250px] overflow-y-scroll h-screen bg-white">
 
-        {/* 投稿欄 */}
-        <div className="p-4 border-b">
-          <textarea
-            className="w-full border p-2"
-            placeholder="いまどうしてる？"
-            value={text}
-            onChange={(e)=>setText(e.target.value)}
-          />
-          <button
-            onClick={post}
-            className="bg-blue-500 text-white px-4 py-1 rounded mt-2"
-          >
-            ポスト
-          </button>
-        </div>
+        {/* ❌ 上の投稿欄は削除済み */}
 
         {/* 投稿一覧 */}
         {posts.map((p)=>(
           <div key={p.id} className="border-b p-4 relative">
 
-            {/* ・・・メニュー */}
+            {/* メニュー */}
             {p.uid===user.uid && (
               <div className="absolute right-2 top-2">
                 <button onClick={()=>setMenuOpen(menuOpen===p.id?null:p.id)}>
@@ -208,7 +195,7 @@ export default function Home(){
 
       </div>
 
-      {/* 右（固定） */}
+      {/* 右 */}
       <div className="w-[250px] fixed right-0 top-0 h-screen p-4">
 
         <div className="bg-white p-4 rounded-xl">
@@ -219,6 +206,46 @@ export default function Home(){
         </div>
 
       </div>
+
+      {/* 🔥 投稿モーダル */}
+      {open && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start pt-20 z-50">
+
+          <div className="bg-white w-[500px] rounded-xl p-4">
+
+            <div className="flex justify-between mb-4">
+              <button onClick={()=>setOpen(false)}>✖</button>
+              <span className="text-blue-500">下書き</span>
+            </div>
+
+            <textarea
+              className="w-full text-xl outline-none"
+              placeholder="いまどうしてる？"
+              value={text}
+              onChange={(e)=>setText(e.target.value)}
+            />
+
+            <div className="flex justify-between items-center mt-4">
+
+              <div className="flex gap-4 text-blue-500">
+                📷 😊 📍
+              </div>
+
+              <button
+                onClick={()=>{
+                  post();
+                  setOpen(false);
+                }}
+                className="bg-blue-500 text-white px-4 py-2 rounded-full"
+              >
+                ポストする
+              </button>
+
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </main>
   );
