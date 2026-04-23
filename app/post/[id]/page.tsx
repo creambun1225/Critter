@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { db, auth } from "@/lib/firebase";
 import {
   doc,
@@ -9,78 +10,147 @@ import {
   addDoc,
   query,
   where,
-  onSnapshot
+  onSnapshot,
+  runTransaction
 } from "firebase/firestore";
-import { useParams } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
 
-export default function PostDetail() {
+type Post = {
+  id: string;
+  uid: string;
+  username: string;
+  text: string;
+  parentId?: string | null;
+  likes: number;
+};
+
+export default function PostPage(){
+
   const { id } = useParams();
-  const [post,setPost]=useState<any>(null);
-  const [replies,setReplies]=useState<any[]>([]);
-  const [text,setText]=useState("");
-  const [user,setUser]=useState<any>(null);
 
+  const [user,setUser]=useState<any>(null);
+  const [post,setPost]=useState<Post | null>(null);
+  const [replies,setReplies]=useState<Post[]>([]);
+  const [text,setText]=useState("");
+
+  // ログイン
   useEffect(()=>{
-    const u = auth.currentUser;
-    if(!u) window.location.href="/login";
-    else setUser(u);
+    return onAuthStateChanged(auth,(u)=>{
+      if(!u) window.location.href="/login";
+      else setUser(u);
+    });
   },[]);
 
+  // データ取得
   useEffect(()=>{
     if(!id) return;
 
-    getDoc(doc(db,"posts",id as string))
-      .then(d=>setPost(d.data()));
-
-    const q=query(collection(db,"replies"),where("postId","==",id));
-    return onSnapshot(q,s=>{
-      setReplies(s.docs.map(d=>d.data()));
+    // 親ポスト
+    getDoc(doc(db,"posts",id as string)).then(d=>{
+      if(!d.exists()) return;
+      setPost({
+        id:d.id,
+        ...(d.data() as any)
+      });
     });
 
+    // 返信
+    const q=query(
+      collection(db,"posts"),
+      where("parentId","==",id)
+    );
+
+    const unsub=onSnapshot(q,(snap)=>{
+      const list=snap.docs.map((d:any)=>({
+        id:d.id,
+        ...(d.data() as any)
+      }));
+      setReplies(list);
+    });
+
+    return ()=>unsub();
   },[id]);
 
-  const sendReply = async ()=>{
-    if(!text) return;
+  // 返信投稿
+  const reply=async()=>{
+    if(!text || !user) return;
 
-    await addDoc(collection(db,"replies"),{
+    await addDoc(collection(db,"posts"),{
       text,
-      postId:id,
-      uid:user.uid
+      uid:user.uid,
+      username:user.email,
+      parentId:id,
+      createdAt:Date.now(),
+      likes:0
     });
 
     setText("");
   };
 
-  if(!post) return <div>読み込み中...</div>;
+  // いいね
+  const like=async(p:Post)=>{
+    const ref=doc(db,"posts",p.id);
+
+    await runTransaction(db,async(tx)=>{
+      const snap=await tx.get(ref);
+      const current=snap.data()?.likes || 0;
+
+      tx.update(ref,{
+        likes:current+1
+      });
+    });
+  };
+
+  if(!post) return <div>loading...</div>;
 
   return (
-    <div className="bg-white min-h-screen p-4">
+    <main className="flex justify-center bg-[#f5f8fa] min-h-screen">
 
-      <h1 className="font-bold">{post.username}</h1>
-      <p>{post.text}</p>
+      <div className="w-[600px] bg-white p-4">
 
-      <div className="mt-4">
-        <textarea
-          className="border w-full p-2"
-          value={text}
-          onChange={(e)=>setText(e.target.value)}
-        />
-        <button
-          onClick={sendReply}
-          className="bg-blue-500 text-white px-4 py-1 mt-2"
-        >
-          返信
-        </button>
-      </div>
+        {/* 親ポスト */}
+        <div className="border-b pb-4 mb-4">
+          <p className="font-bold">{post.username}</p>
+          <p>{post.text}</p>
 
-      <div className="mt-6">
-        {replies.map((r,i)=>(
-          <div key={i} className="border-b p-2">
-            {r.text}
+          <button onClick={()=>like(post)}>
+            ❤️ {post.likes || 0}
+          </button>
+        </div>
+
+        {/* 返信欄 */}
+        <div className="border-b pb-4 mb-4">
+          <textarea
+            className="w-full border p-2"
+            placeholder="返信を書く"
+            value={text}
+            onChange={(e)=>setText(e.target.value)}
+          />
+
+          <button
+            onClick={reply}
+            className="bg-blue-500 text-white px-4 py-1 rounded mt-2"
+          >
+            返信
+          </button>
+        </div>
+
+        {/* 返信一覧 */}
+        {replies.map((r)=>(
+          <div key={r.id} className="border-b p-3">
+
+            <p className="font-bold">{r.username}</p>
+            <p>{r.text}</p>
+
+            <button onClick={()=>like(r)}>
+              ❤️ {r.likes || 0}
+            </button>
+
           </div>
         ))}
+
       </div>
 
-    </div>
+    </main>
   );
 }
