@@ -10,7 +10,6 @@ import {
   query,
   orderBy,
   doc,
-  getDoc,
   runTransaction
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -20,10 +19,9 @@ type Post = {
   uid: string;
   username: string;
   text: string;
-  image?: string;
   parentId?: string | null;
-  createdAt: number;
   likes: number;
+  createdAt: number;
 };
 
 export default function Home(){
@@ -40,7 +38,7 @@ export default function Home(){
     });
   },[]);
 
-  // 投稿取得（親投稿だけ）
+  // 投稿取得
   useEffect(()=>{
     const q=query(collection(db,"posts"),orderBy("createdAt","desc"));
 
@@ -53,7 +51,7 @@ export default function Home(){
         };
       });
 
-      // 親投稿のみ表示
+      // 親投稿のみ
       setPosts(list.filter(p=>!p.parentId));
     });
 
@@ -93,9 +91,27 @@ export default function Home(){
   if(!user) return <div>loading...</div>;
 
   return (
-    <main className="flex justify-center bg-[#f5f8fa] min-h-screen">
+    <main className="flex justify-center bg-[#f5f8fa] h-screen">
 
-      <div className="w-[600px] bg-white">
+      {/* 🔥 左メニュー */}
+      <div className="w-[250px] fixed left-0 top-0 h-screen p-6 border-r bg-white flex flex-col justify-between">
+
+        <div>
+          <h1 className="text-3xl font-bold text-blue-500 mb-10">Critter</h1>
+
+          <div className="flex flex-col gap-8 text-xl">
+            <Link href="/">🏠 ホーム</Link>
+            <Link href="/notifications">🔔 通知</Link>
+            <Link href="/profile">👤 プロフィール</Link>
+            <Link href="/bookmarks">🔖 ブックマーク</Link>
+            <Link href="/settings">⚙️ 設定</Link>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 🔥 真ん中（TL） */}
+      <div className="w-[600px] ml-[250px] mr-[250px] overflow-y-scroll h-screen bg-white">
 
         {/* 投稿欄 */}
         <div className="p-4 border-b">
@@ -114,13 +130,13 @@ export default function Home(){
           </button>
         </div>
 
-        {/* 投稿一覧 */}
+        {/* 投稿 */}
         {posts.map((p)=>(
           <div key={p.id} className="border-b p-4">
 
             <p className="font-bold">{p.username}</p>
 
-            {/* 👇クリックで詳細 */}
+            {/* 詳細へ */}
             <Link href={`/post/${p.id}`}>
               <p className="cursor-pointer hover:underline">
                 {p.text}
@@ -136,6 +152,18 @@ export default function Home(){
 
           </div>
         ))}
+
+      </div>
+
+      {/* 🔥 右（トレンド） */}
+      <div className="w-[250px] fixed right-0 top-0 h-screen p-4">
+
+        <div className="bg-white p-4 rounded-xl">
+          <h2 className="font-bold mb-2">🔥 トレンド</h2>
+          <p>AI</p>
+          <p>ゲーム</p>
+          <p>マイクラ</p>
+        </div>
 
       </div>
 
