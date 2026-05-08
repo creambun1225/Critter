@@ -1,128 +1,253 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import {
   auth,
   db
-} from "../../lib/firebase";
+} from "@/lib/firebase";
+
+import {
+  onAuthStateChanged
+} from "firebase/auth";
 
 import {
   doc,
-  getDoc
+  getDoc,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  orderBy
 } from "firebase/firestore";
 
-import {
-  useEffect,
-  useState
-} from "react";
+import Link from "next/link";
 
-export default function ProfilePage() {
+export default function Profile() {
 
-  const user = auth.currentUser;
+  const [profile, setProfile] = useState<any>(null);
 
-  const [name, setName] = useState("");
-
-  const [bio, setBio] = useState("");
+  const [posts, setPosts] = useState<any[]>([]);
 
   useEffect(() => {
 
-    const loadProfile = async () => {
+    return onAuthStateChanged(auth, async (user) => {
 
-      if (!user) return;
+      if (!user) {
 
+        location.href = "/login";
+
+        return;
+
+      }
+
+      // プロフィール取得
       const snap = await getDoc(
         doc(db, "users", user.uid)
       );
 
       if (snap.exists()) {
 
-        const data = snap.data();
-
-        setName(data.name || "");
-        setBio(data.bio || "");
-
-      } else {
-
-        setName(user.email?.split("@")[0] || "");
-        setBio("Critter user");
+        setProfile(snap.data());
 
       }
 
-    };
+      // 自分の投稿取得
+      const q = query(
+        collection(db, "posts"),
+        where("uid", "==", user.uid),
+        orderBy("createdAt", "desc")
+      );
 
-    loadProfile();
+      onSnapshot(q, (snap) => {
 
-  }, [user]);
+        setPosts(
+          snap.docs.map((d) => ({
+            id: d.id,
+            ...d.data()
+          }))
+        );
+
+      });
+
+    });
+
+  }, []);
+
+  if (!profile) {
+
+    return (
+      <div className="flex justify-center items-center h-screen text-zinc-500">
+        Loading...
+      </div>
+    );
+
+  }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-black text-white">
 
-      {/* ヘッダー */}
-      <div className="sticky top-0 z-50 bg-black/80 backdrop-blur border-b border-zinc-800 p-4">
+      {/* 上 */}
+      <div className="sticky top-0 z-50 backdrop-blur bg-black/80 border-b border-zinc-800 p-4">
 
-        <h1 className="text-xl font-bold">
+        <h1 className="text-2xl font-bold">
           プロフィール
         </h1>
 
       </div>
 
-      {/* バナー */}
-      <div className="h-52 bg-zinc-800" />
-
       {/* プロフィール */}
-      <div className="p-4 border-b border-zinc-800">
+      <div className="border-b border-zinc-800">
 
-        {/* アイコン */}
-        <div className="w-28 h-28 rounded-full bg-zinc-700 border-4 border-black -mt-16" />
+        {/* ヘッダー */}
+        <div className="h-40 bg-zinc-800" />
 
-        {/* 名前 */}
-        <div className="mt-4">
+        <div className="p-4">
 
-          <h1 className="text-2xl font-bold">
-            {name}
-          </h1>
+          {/* アイコン */}
+          <div className="-mt-20">
 
-          <p className="text-zinc-500">
-            @{name}
+            {profile.icon ? (
+
+              <img
+                src={profile.icon}
+                className="w-32 h-32 rounded-full border-4 border-black object-cover"
+              />
+
+            ) : (
+
+              <div className="w-32 h-32 rounded-full border-4 border-black bg-zinc-700" />
+
+            )}
+
+          </div>
+
+          {/* 編集 */}
+          <div className="flex justify-end">
+
+            <Link href="/edit-profile">
+
+              <button className="border border-zinc-700 hover:bg-zinc-900 transition px-5 py-2 rounded-full font-bold">
+                プロフィールを編集
+              </button>
+
+            </Link>
+
+          </div>
+
+          {/* 名前 */}
+          <div className="mt-4">
+
+            <h1 className="text-3xl font-bold">
+              {profile.name}
+            </h1>
+
+            <p className="text-zinc-500">
+              @{profile.username}
+            </p>
+
+          </div>
+
+          {/* bio */}
+          <p className="mt-4 whitespace-pre-wrap">
+            {profile.bio}
           </p>
 
         </div>
 
-        {/* 自己紹介 */}
-        <p className="mt-4">
-          {bio}
-        </p>
+      </div>
 
-        {/* フォロー */}
-        <div className="flex gap-6 mt-4 text-zinc-500">
+      {/* 投稿 */}
+      <div>
 
-          <p>
-            <span className="text-white font-bold">
-              0
-            </span>{" "}
-            フォロー中
-          </p>
+        {posts.length === 0 && (
 
-          <p>
-            <span className="text-white font-bold">
-              0
-            </span>{" "}
-            フォロワー
-          </p>
+          <div className="p-8 text-center text-zinc-500">
+            まだクリートがありません
+          </div>
 
-        </div>
+        )}
 
-        {/* 編集 */}
-        <Link href="/edit-profile">
+        {posts.map((p) => (
 
-          <button className="mt-6 border border-zinc-700 hover:bg-zinc-900 transition px-5 py-2 rounded-full font-bold">
+          <div
+            key={p.id}
+            className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition"
+          >
 
-            プロフィールを編集
+            <div className="flex gap-4">
 
-          </button>
+              {/* アイコン */}
+              {p.icon ? (
 
-        </Link>
+                <img
+                  src={p.icon}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+
+              ) : (
+
+                <div className="w-12 h-12 rounded-full bg-zinc-700" />
+
+              )}
+
+              {/* 本文 */}
+              <div className="flex-1">
+
+                {/* 名前 */}
+                <Link href={`/user/${p.uid}`}>
+
+                  <div className="flex items-center gap-2 hover:underline cursor-pointer">
+
+                    <p className="font-bold">
+                      {p.username}
+                    </p>
+
+                    <p className="text-zinc-500">
+                      @{p.username}
+                    </p>
+
+                  </div>
+
+                </Link>
+
+                {/* 投稿 */}
+                <Link href={`/post/${p.id}`}>
+
+                  <p className="mt-2 whitespace-pre-wrap hover:underline">
+                    {p.text}
+                  </p>
+
+                </Link>
+
+                {/* ボタン */}
+                <div className="flex gap-8 mt-4 text-zinc-500">
+
+                  <Link href={`/post/${p.id}`}>
+
+                    <button className="hover:text-sky-500 transition">
+                      💬
+                    </button>
+
+                  </Link>
+
+                  <button className="hover:text-green-500 transition">
+                    🔁
+                  </button>
+
+                  <button className="hover:text-pink-500 transition">
+                    ❤️ {p.likes || 0}
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        ))}
 
       </div>
 
