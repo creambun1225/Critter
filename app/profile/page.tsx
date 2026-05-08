@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { auth } from "../../lib/firebase";
 
 export default function ProfilePage() {
@@ -64,10 +65,16 @@ export default function ProfilePage() {
 
         </div>
 
-        {/* 編集 */}
-        <button className="mt-6 border border-zinc-700 hover:bg-zinc-900 transition px-5 py-2 rounded-full font-bold">
-          プロフィールを編集
-        </button>
+        {/* 編集ボタン */}
+        <Link href="/edit-profile">
+
+          <button className="mt-6 border border-zinc-700 hover:bg-zinc-900 transition px-5 py-2 rounded-full font-bold">
+
+            プロフィールを編集
+
+          </button>
+
+        </Link>
 
       </div>
 
