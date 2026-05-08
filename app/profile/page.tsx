@@ -1,153 +1,76 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { db, auth } from "@/lib/firebase";
-import {
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  onSnapshot
-} from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "../../lib/firebase";
 
-export default function Profile(){
+export default function ProfilePage() {
 
-  const [user,setUser]=useState<any>(null);
-  const [data,setData]=useState<any>(null);
-  const [posts,setPosts]=useState<any[]>([]);
-  const [trends,setTrends]=useState<string[]>([]);
-
-  // ログインチェック
-  useEffect(()=>{
-    return onAuthStateChanged(auth,(u)=>{
-      if(!u) window.location.href="/login";
-      else setUser(u);
-    });
-  },[]);
-
-  // データ取得
-  useEffect(()=>{
-    if(!user) return;
-
-    getDoc(doc(db,"users",user.uid))
-      .then(d=>setData(d.data()));
-
-    const q=query(collection(db,"posts"),where("uid","==",user.uid));
-    const unsub=onSnapshot(q,s=>{
-      const list=s.docs.map(d=>d.data());
-      setPosts(list);
-
-      // トレンド
-      const words:any={};
-      list.forEach((p:any)=>{
-        if(!p.text) return;
-        p.text.split(/[\s　]+/).forEach((w:string)=>{
-          if(w.length<2) return;
-          words[w]=(words[w]||0)+1;
-        });
-      });
-
-      const sorted=Object.entries(words)
-        .sort((a:any,b:any)=>b[1]-a[1])
-        .slice(0,5)
-        .map((w:any)=>w[0]);
-
-      setTrends(sorted);
-    });
-
-    return ()=>unsub();
-
-  },[user]);
-
-  if(!user || !data) return <div>読み込み中...</div>;
+  const user = auth.currentUser;
 
   return (
-    <main className="flex justify-center bg-[#f5f8fa] min-h-screen">
+    <div className="min-h-screen">
 
-      {/* 左メニュー */}
-      <div className="w-[250px] p-6 border-r flex flex-col justify-between">
+      {/* ヘッダー */}
+      <div className="sticky top-0 z-50 bg-black/80 backdrop-blur border-b border-zinc-800 p-4">
 
-        <div>
-          <h1 className="text-3xl font-bold text-blue-500 mb-8">Critter</h1>
-
-          <div className="flex flex-col gap-7 text-xl font-medium">
-            <Link href="/">🏠 ホーム</Link>
-            <Link href="/notifications">🔔 通知</Link>
-            <Link href="/profile">👤 プロフィール</Link>
-            <Link href="/bookmarks">🔖 ブックマーク</Link>
-            <Link href="/settings">⚙️ 設定</Link>
-          </div>
-
-          <button
-            onClick={()=>signOut(auth)}
-            className="mt-10 text-red-500"
-          >
-            ログアウト
-          </button>
-        </div>
+        <h1 className="text-xl font-bold">
+          プロフィール
+        </h1>
 
       </div>
 
-      {/* 真ん中（プロフィール） */}
-      <div className="w-[600px] bg-white border-x">
+      {/* バナー */}
+      <div className="h-52 bg-zinc-800" />
 
-        {/* ヘッダー */}
-        <div
-          className="h-40 bg-gray-300"
-          style={{
-            backgroundImage:`url(${data.header})`,
-            backgroundSize:"cover"
-          }}
-        />
+      {/* プロフィール */}
+      <div className="p-4 border-b border-zinc-800">
 
         {/* アイコン */}
-        <img
-          src={data.icon || "https://via.placeholder.com/100"}
-          className="w-24 h-24 rounded-full -mt-12 ml-4 border-4 border-white"
-        />
+        <div className="w-28 h-28 rounded-full bg-zinc-700 border-4 border-black -mt-16" />
 
-        {/* 名前＋編集 */}
-        <div className="flex justify-between items-center p-4">
-          <div>
-            <h1 className="text-xl font-bold">{data.username}</h1>
-            <p className="text-gray-500">@{data.username}</p>
-          </div>
+        {/* 名前 */}
+        <div className="mt-4">
 
-          <button
-            onClick={()=>window.location.href="/edit-profile"}
-            className="border px-4 py-1 rounded-full hover:bg-gray-100"
-          >
-            プロフィールを編集
-          </button>
+          <h1 className="text-2xl font-bold">
+            {user?.email?.split("@")[0]}
+          </h1>
+
+          <p className="text-zinc-500">
+            @{user?.email?.split("@")[0]}
+          </p>
+
         </div>
 
         {/* 自己紹介 */}
-        <div className="px-4 pb-4 text-gray-700">
-          {data.bio}
+        <p className="mt-4">
+          Critter user
+        </p>
+
+        {/* フォロー */}
+        <div className="flex gap-6 mt-4 text-zinc-500">
+
+          <p>
+            <span className="text-white font-bold">
+              0
+            </span>{" "}
+            フォロー中
+          </p>
+
+          <p>
+            <span className="text-white font-bold">
+              0
+            </span>{" "}
+            フォロワー
+          </p>
+
         </div>
 
-        {/* 投稿 */}
-        <div className="border-t">
-          {posts.map((p,i)=>(
-            <div key={i} className="border-b p-4">
-              {p.text}
-            </div>
-          ))}
-        </div>
+        {/* 編集 */}
+        <button className="mt-6 border border-zinc-700 hover:bg-zinc-900 transition px-5 py-2 rounded-full font-bold">
+          プロフィールを編集
+        </button>
 
       </div>
 
-      {/* 右トレンド */}
-      <div className="w-[250px] p-4">
-        <div className="bg-white p-4 rounded-xl">
-          <h2 className="font-bold mb-2">🔥 トレンド</h2>
-          {trends.map((t,i)=><p key={i}>{t}</p>)}
-        </div>
-      </div>
-
-    </main>
+    </div>
   );
 }
