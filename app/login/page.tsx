@@ -84,30 +84,33 @@ export default function Login() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-black text-white">
+    <div className="flex justify-center items-center min-h-screen bg-black">
 
       <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl w-[360px]">
 
         {/* タイトル */}
-        <h1 className="text-3xl font-bold mb-8 text-center">
+        <h1 className="text-3xl font-bold mb-8 text-center text-white">
           Critter
         </h1>
 
         {/* メール */}
         <input
-          className="bg-black border border-zinc-700 rounded-xl p-4 w-full mb-4 text-white placeholder:text-zinc-500 outline-none focus:border-blue-500 transition"
+          type="email"
           placeholder="メールアドレス"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          style={{ color: "black" }}
+          className="bg-white border border-zinc-300 rounded-xl p-4 w-full mb-4 placeholder:text-zinc-500 outline-none"
         />
 
         {/* パスワード */}
         <input
-          className="bg-black border border-zinc-700 rounded-xl p-4 w-full mb-4 text-white placeholder:text-zinc-500 outline-none focus:border-blue-500 transition"
-          placeholder="パスワード"
           type="password"
+          placeholder="パスワード"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          style={{ color: "black" }}
+          className="bg-white border border-zinc-300 rounded-xl p-4 w-full mb-4 placeholder:text-zinc-500 outline-none"
         />
 
         {/* エラー */}
