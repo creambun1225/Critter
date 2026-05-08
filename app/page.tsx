@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { db, auth } from "../lib/firebase";
+import {
+  db,
+  auth
+} from "../lib/firebase";
 
 import {
   collection,
@@ -13,9 +16,12 @@ import {
   orderBy,
   doc,
   runTransaction,
+  getDoc
 } from "firebase/firestore";
 
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  onAuthStateChanged
+} from "firebase/auth";
 
 export default function Home() {
 
@@ -25,14 +31,43 @@ export default function Home() {
 
   const [text, setText] = useState("");
 
+  const [profileName, setProfileName] = useState("");
+
   useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
+
+    return onAuthStateChanged(auth, async (u) => {
+
       if (!u) {
+
         location.href = "/login";
+
       } else {
+
         setUser(u);
+
+        // プロフィール取得
+        const snap = await getDoc(
+          doc(db, "users", u.uid)
+        );
+
+        if (snap.exists()) {
+
+          setProfileName(
+            snap.data().name
+          );
+
+        } else {
+
+          setProfileName(
+            u.email?.split("@")[0] || ""
+          );
+
+        }
+
       }
+
     });
+
   }, []);
 
   useEffect(() => {
@@ -62,13 +97,21 @@ export default function Home() {
     if (!text.trim()) return;
 
     await addDoc(collection(db, "posts"), {
+
       text,
+
       uid: user.uid,
-      username: user.email,
+
+      username: profileName,
+
       createdAt: Date.now(),
+
       likes: 0,
+
       likedBy: [],
+
       parentId: null,
+
     });
 
     setText("");
@@ -97,11 +140,13 @@ export default function Home() {
   };
 
   if (!user) {
+
     return (
       <div className="p-10 text-center text-zinc-500">
         Loading...
       </div>
     );
+
   }
 
   return (
@@ -138,7 +183,7 @@ export default function Home() {
                 onClick={post}
                 className="bg-blue-500 hover:bg-blue-600 transition px-5 py-2 rounded-full font-bold"
               >
-                ポスト
+                クリート
               </button>
 
             </div>
@@ -166,11 +211,11 @@ export default function Home() {
               <div className="flex items-center gap-2">
 
                 <p className="font-bold">
-                  {p.username?.split("@")[0]}
+                  {p.username}
                 </p>
 
                 <p className="text-zinc-500 text-sm">
-                  @{p.username?.split("@")[0]}
+                  @{p.username}
                 </p>
 
               </div>
