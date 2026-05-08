@@ -1,11 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import { auth } from "../../lib/firebase";
+
+import {
+  auth,
+  db
+} from "../../lib/firebase";
+
+import {
+  doc,
+  getDoc
+} from "firebase/firestore";
+
+import {
+  useEffect,
+  useState
+} from "react";
 
 export default function ProfilePage() {
 
   const user = auth.currentUser;
+
+  const [name, setName] = useState("");
+
+  const [bio, setBio] = useState("");
+
+  useEffect(() => {
+
+    const loadProfile = async () => {
+
+      if (!user) return;
+
+      const snap = await getDoc(
+        doc(db, "users", user.uid)
+      );
+
+      if (snap.exists()) {
+
+        const data = snap.data();
+
+        setName(data.name || "");
+        setBio(data.bio || "");
+
+      } else {
+
+        setName(user.email?.split("@")[0] || "");
+        setBio("Critter user");
+
+      }
+
+    };
+
+    loadProfile();
+
+  }, [user]);
 
   return (
     <div className="min-h-screen">
@@ -32,18 +80,18 @@ export default function ProfilePage() {
         <div className="mt-4">
 
           <h1 className="text-2xl font-bold">
-            {user?.email?.split("@")[0]}
+            {name}
           </h1>
 
           <p className="text-zinc-500">
-            @{user?.email?.split("@")[0]}
+            @{name}
           </p>
 
         </div>
 
         {/* 自己紹介 */}
         <p className="mt-4">
-          Critter user
+          {bio}
         </p>
 
         {/* フォロー */}
@@ -65,7 +113,7 @@ export default function ProfilePage() {
 
         </div>
 
-        {/* 編集ボタン */}
+        {/* 編集 */}
         <Link href="/edit-profile">
 
           <button className="mt-6 border border-zinc-700 hover:bg-zinc-900 transition px-5 py-2 rounded-full font-bold">

@@ -1,23 +1,82 @@
 "use client";
 
-import { useState } from "react";
-import { auth } from "../../lib/firebase";
+import { useEffect, useState } from "react";
+
+import {
+  auth,
+  db
+} from "../../lib/firebase";
+
+import {
+  doc,
+  getDoc,
+  setDoc
+} from "firebase/firestore";
 
 export default function EditProfilePage() {
 
   const user = auth.currentUser;
 
-  const [name, setName] = useState(
-    user?.email?.split("@")[0] || ""
-  );
+  const [name, setName] = useState("");
 
-  const [bio, setBio] = useState("Critter user");
+  const [bio, setBio] = useState("");
 
-  const save = () => {
+  const [loading, setLoading] = useState(true);
 
-    alert("プロフィール保存機能はこれから追加");
+  useEffect(() => {
+
+    const loadProfile = async () => {
+
+      if (!user) return;
+
+      const ref = doc(db, "users", user.uid);
+
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+
+        const data = snap.data();
+
+        setName(data.name || "");
+        setBio(data.bio || "");
+
+      } else {
+
+        setName(user.email?.split("@")[0] || "");
+        setBio("Critter user");
+
+      }
+
+      setLoading(false);
+
+    };
+
+    loadProfile();
+
+  }, [user]);
+
+  const save = async () => {
+
+    if (!user) return;
+
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      name,
+      bio,
+      email: user.email,
+    });
+
+    alert("プロフィールを保存しました");
 
   };
+
+  if (loading) {
+    return (
+      <div className="p-10 text-zinc-500">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
