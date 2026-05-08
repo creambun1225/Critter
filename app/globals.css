@@ -2,7 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
 body {
-  color: black;
-  background-color: #f5f8fa;
+  background: black;
+  color: white;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+textarea:focus,
+input:focus {
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #222;
+  border-radius: 999px;
 }
