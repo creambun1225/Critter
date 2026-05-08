@@ -21,6 +21,8 @@ export default function EditProfilePage() {
 
   const [bio, setBio] = useState("");
 
+  const [icon, setIcon] = useState("");
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,6 +41,7 @@ export default function EditProfilePage() {
 
         setName(data.name || "");
         setBio(data.bio || "");
+        setIcon(data.icon || "");
 
       } else {
 
@@ -55,27 +58,59 @@ export default function EditProfilePage() {
 
   }, [user]);
 
+  // アイコン選択
+  const handleIconChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+
+      setIcon(reader.result as string);
+
+    };
+
+    reader.readAsDataURL(file);
+
+  };
+
   const save = async () => {
 
     if (!user) return;
 
     await setDoc(doc(db, "users", user.uid), {
+
       uid: user.uid,
+
       name,
+
       bio,
+
+      icon,
+
       email: user.email,
+
     });
 
     alert("プロフィールを保存しました");
 
+    location.href = "/profile";
+
   };
 
   if (loading) {
+
     return (
       <div className="p-10 text-zinc-500">
         Loading...
       </div>
     );
+
   }
 
   return (
@@ -96,11 +131,29 @@ export default function EditProfilePage() {
         {/* アイコン */}
         <div>
 
-          <p className="mb-2 text-zinc-500">
+          <p className="mb-3 text-zinc-500">
             アイコン
           </p>
 
-          <div className="w-24 h-24 rounded-full bg-zinc-700" />
+          {icon ? (
+
+            <img
+              src={icon}
+              className="w-28 h-28 rounded-full object-cover border border-zinc-700"
+            />
+
+          ) : (
+
+            <div className="w-28 h-28 rounded-full bg-zinc-700" />
+
+          )}
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleIconChange}
+            className="mt-4 block text-sm text-zinc-400"
+          />
 
         </div>
 

@@ -1,4 +1,18 @@
+"use client";
+
+import { signOut } from "firebase/auth";
+import { auth } from "../../lib/firebase";
+
 export default function SettingsPage() {
+
+  const logout = async () => {
+
+    await signOut(auth);
+
+    location.href = "/login";
+
+  };
+
   return (
     <div className="min-h-screen">
 
@@ -28,6 +42,14 @@ export default function SettingsPage() {
 
         <button className="w-full bg-zinc-900 hover:bg-zinc-800 transition p-4 rounded-2xl text-left">
           表示設定
+        </button>
+
+        {/* ログアウト */}
+        <button
+          onClick={logout}
+          className="w-full bg-red-500 hover:bg-red-600 transition p-4 rounded-2xl font-bold"
+        >
+          ログアウト
         </button>
 
       </div>
