@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import Link from "next/link";
 
 import {
@@ -31,8 +32,9 @@ export default function Home() {
 
   const [text, setText] = useState("");
 
-  const [profileName, setProfileName] = useState("");
+  const [profile, setProfile] = useState<any>(null);
 
+  // ログイン
   useEffect(() => {
 
     return onAuthStateChanged(auth, async (u) => {
@@ -45,22 +47,13 @@ export default function Home() {
 
         setUser(u);
 
-        // プロフィール取得
         const snap = await getDoc(
           doc(db, "users", u.uid)
         );
 
         if (snap.exists()) {
 
-          setProfileName(
-            snap.data().name
-          );
-
-        } else {
-
-          setProfileName(
-            u.email?.split("@")[0] || ""
-          );
+          setProfile(snap.data());
 
         }
 
@@ -70,6 +63,7 @@ export default function Home() {
 
   }, []);
 
+  // 投稿取得
   useEffect(() => {
 
     const q = query(
@@ -80,18 +74,17 @@ export default function Home() {
     return onSnapshot(q, (snap) => {
 
       setPosts(
-        snap.docs
-          .map((d) => ({
-            id: d.id,
-            ...d.data(),
-          }))
-          .filter((p: any) => !p.parentId)
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }))
       );
 
     });
 
   }, []);
 
+  // 投稿
   const post = async () => {
 
     if (!text.trim()) return;
@@ -102,7 +95,9 @@ export default function Home() {
 
       uid: user.uid,
 
-      username: profileName,
+      username: profile?.name || "user",
+
+      icon: profile?.icon || "",
 
       createdAt: Date.now(),
 
@@ -110,14 +105,13 @@ export default function Home() {
 
       likedBy: [],
 
-      parentId: null,
-
     });
 
     setText("");
 
   };
 
+  // いいね
   const like = async (p: any) => {
 
     const ref = doc(db, "posts", p.id);
@@ -131,18 +125,24 @@ export default function Home() {
       if (data?.likedBy?.includes(user.uid)) return;
 
       tx.update(ref, {
+
         likes: (data?.likes || 0) + 1,
-        likedBy: [...(data?.likedBy || []), user.uid],
+
+        likedBy: [
+          ...(data?.likedBy || []),
+          user.uid
+        ],
+
       });
 
     });
 
   };
 
-  if (!user) {
+  if (!user || !profile) {
 
     return (
-      <div className="p-10 text-center text-zinc-500">
+      <div className="flex justify-center items-center h-screen text-zinc-500">
         Loading...
       </div>
     );
@@ -150,38 +150,53 @@ export default function Home() {
   }
 
   return (
-    <div>
+    <div className="min-h-screen bg-black text-white">
 
       {/* 上 */}
       <div className="sticky top-0 z-50 backdrop-blur bg-black/80 border-b border-zinc-800 p-4">
 
-        <h1 className="text-xl font-bold">
+        <h1 className="text-2xl font-bold">
           ホーム
         </h1>
 
       </div>
 
-      {/* 投稿 */}
+      {/* 投稿欄 */}
       <div className="border-b border-zinc-800 p-4">
 
-        <div className="flex gap-3">
+        <div className="flex gap-4">
 
-          <div className="w-12 h-12 rounded-full bg-zinc-700 shrink-0" />
+          {/* アイコン */}
+          {profile.icon ? (
 
+            <img
+              src={profile.icon}
+              className="w-12 h-12 rounded-full object-cover"
+            />
+
+          ) : (
+
+            <div className="w-12 h-12 rounded-full bg-zinc-700" />
+
+          )}
+
+          {/* 入力 */}
           <div className="flex-1">
 
             <textarea
               placeholder="いまどうしてる？"
-              className="w-full bg-transparent text-xl resize-none min-h-[100px] placeholder:text-zinc-500"
+              className="w-full bg-transparent text-xl resize-none outline-none min-h-[120px] placeholder:text-zinc-500"
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) =>
+                setText(e.target.value)
+              }
             />
 
-            <div className="flex justify-end mt-4">
+            <div className="flex justify-end">
 
               <button
                 onClick={post}
-                className="bg-blue-500 hover:bg-blue-600 transition px-5 py-2 rounded-full font-bold"
+                className="bg-blue-500 hover:bg-blue-600 transition px-6 py-2 rounded-full font-bold"
               >
                 クリート
               </button>
@@ -194,7 +209,7 @@ export default function Home() {
 
       </div>
 
-      {/* TL */}
+      {/* 投稿一覧 */}
       {posts.map((p) => (
 
         <div
@@ -202,10 +217,23 @@ export default function Home() {
           className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition"
         >
 
-          <div className="flex gap-3">
+          <div className="flex gap-4">
 
-            <div className="w-12 h-12 rounded-full bg-zinc-700 shrink-0" />
+            {/* アイコン */}
+            {p.icon ? (
 
+              <img
+                src={p.icon}
+                className="w-12 h-12 rounded-full object-cover"
+              />
+
+            ) : (
+
+              <div className="w-12 h-12 rounded-full bg-zinc-700" />
+
+            )}
+
+            {/* 本文 */}
             <div className="flex-1">
 
               <div className="flex items-center gap-2">
@@ -214,7 +242,7 @@ export default function Home() {
                   {p.username}
                 </p>
 
-                <p className="text-zinc-500 text-sm">
+                <p className="text-zinc-500">
                   @{p.username}
                 </p>
 
@@ -222,13 +250,14 @@ export default function Home() {
 
               <Link href={`/post/${p.id}`}>
 
-                <p className="mt-2 whitespace-pre-wrap text-[15px] hover:underline cursor-pointer">
+                <p className="mt-2 whitespace-pre-wrap hover:underline">
                   {p.text}
                 </p>
 
               </Link>
 
-              <div className="flex gap-8 mt-4 text-zinc-500 text-sm">
+              {/* ボタン */}
+              <div className="flex gap-8 mt-4 text-zinc-500">
 
                 <button className="hover:text-sky-500 transition">
                   💬
