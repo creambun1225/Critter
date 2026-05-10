@@ -171,7 +171,7 @@ export default function Home() {
               e.target.value
             )
           }
-          placeholder="いまどうしてるんだい？"
+          placeholder="いまどうしてる？"
           className="w-full bg-black text-white outline-none resize-none text-xl min-h-[120px]"
         />
 
