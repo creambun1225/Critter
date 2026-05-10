@@ -349,18 +349,22 @@ export default function Home() {
             {/* アイコン */}
             <Link href={`/user/${p.uid}`}>
 
-              {p.icon ? (
+              <div className="w-12 h-12 min-w-[48px] min-h-[48px] overflow-hidden rounded-full bg-zinc-700 flex items-center justify-center">
 
-                <img
-                  src={p.icon}
-                  className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full object-cover bg-zinc-700 cursor-pointer"
-                />
+                {p.icon ? (
 
-              ) : (
+                  <img
+                    src={p.icon}
+                    className="w-full h-full object-cover"
+                  />
 
-                <div className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-zinc-700 cursor-pointer" />
+                ) : (
 
-              )}
+                  <div className="w-full h-full bg-zinc-700" />
+
+                )}
+
+              </div>
 
             </Link>
 
@@ -369,14 +373,14 @@ export default function Home() {
               {/* 名前 */}
               <Link href={`/user/${p.uid}`}>
 
-                <div className="hover:underline cursor-pointer flex items-center gap-2">
+                <div className="hover:underline cursor-pointer flex items-center gap-2 flex-wrap">
 
                   <span className="font-bold">
                     {p.name}
                   </span>
 
                   {/* 青認証 */}
-                  {p.verified && (
+                  {p.verified === true && (
 
                     <img
                       src="/verified-blue.png"
@@ -386,7 +390,7 @@ export default function Home() {
                   )}
 
                   {/* 金認証 */}
-                  {p.admin && (
+                  {p.admin === true && (
 
                     <img
                       src="/verified-gold.png"
