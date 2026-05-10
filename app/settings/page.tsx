@@ -17,19 +17,25 @@ import {
   updateDoc
 } from "firebase/firestore";
 
-import Link from "next/link";
-
 export default function SettingsPage() {
 
-  const [showAdmin, setShowAdmin] = useState(false);
+  const [showAdmin, setShowAdmin] =
+    useState(false);
 
-  const [showAccount, setShowAccount] = useState(false);
+  const [showAccount, setShowAccount] =
+    useState(false);
 
-  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] =
+    useState(false);
 
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [password, setPassword] =
+    useState("");
 
-  const [profile, setProfile] = useState<any>(null);
+  const [isAdmin, setIsAdmin] =
+    useState(false);
+
+  const [profile, setProfile] =
+    useState<any>(null);
 
   useEffect(() => {
 
@@ -149,9 +155,24 @@ export default function SettingsPage() {
                 パスワード
               </p>
 
-              <p>
-                ••••••••
-              </p>
+              <div className="flex items-center gap-3">
+
+                <p>
+                  {showPassword
+                    ? "Firebaseでは現在のパスワードは取得できません"
+                    : "••••••••"}
+                </p>
+
+                <button
+                  onClick={() =>
+                    setShowPassword(!showPassword)
+                  }
+                  className="text-blue-500 text-sm"
+                >
+                  表示
+                </button>
+
+              </div>
 
             </div>
 
@@ -161,13 +182,9 @@ export default function SettingsPage() {
                 ブックマーク数
               </p>
 
-              <Link href="/bookmarks">
-
-                <p className="text-blue-500 hover:underline cursor-pointer">
-                  {profile.bookmarks?.length || 0}件
-                </p>
-
-              </Link>
+              <p>
+                {profile.bookmarks?.length || 0}件
+              </p>
 
             </div>
 
@@ -218,17 +235,6 @@ export default function SettingsPage() {
           </div>
 
         )}
-
-        {/* ブックマーク */}
-        <Link href="/bookmarks">
-
-          <button className="w-full bg-zinc-900 hover:bg-zinc-800 transition p-4 rounded-2xl text-left">
-
-            ブックマークを見る
-
-          </button>
-
-        </Link>
 
         {/* ログアウト */}
         <button
