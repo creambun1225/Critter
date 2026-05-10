@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import Link from "next/link";
 
 import {
-  db,
-  auth
+  auth,
+  db
 } from "@/lib/firebase";
+
+import {
+  onAuthStateChanged
+} from "firebase/auth";
 
 import {
   collection,
@@ -15,42 +20,62 @@ import {
   query,
   orderBy,
   doc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
   getDoc
 } from "firebase/firestore";
 
-import {
-  onAuthStateChanged
-} from "firebase/auth";
+import PostCard from "@/components/PostCard";
 
-export default function Home() {
+export default function HomePage() {
 
   const [user, setUser] =
     useState<any>(null);
 
-  const [posts, setPosts] =
-    useState<any[]>([]);
+  const [currentUser, setCurrentUser] =
+    useState<any>(null);
 
   const [text, setText] =
     useState("");
 
-  // ログイン確認
+  const [posts, setPosts] =
+    useState<any[]>([]);
+
+  // ログイン
   useEffect(() => {
 
     return onAuthStateChanged(
       auth,
-      (u) => {
+      async (u) => {
 
         if (!u) {
 
           location.href =
             "/login";
 
-        } else {
+          return;
 
-          setUser(u);
+        }
+
+        setUser(u);
+
+        // 自分情報
+        const userSnap =
+          await getDoc(
+            doc(
+              db,
+              "users",
+              u.uid
+            )
+          );
+
+        if (userSnap.exists()) {
+
+          setCurrentUser({
+
+            uid: u.uid,
+
+            ...userSnap.data()
+
+          });
 
         }
 
@@ -62,235 +87,97 @@ export default function Home() {
   // 投稿取得
   useEffect(() => {
 
-    const q = query(
-      collection(db, "posts"),
-      orderBy(
-        "createdAt",
-        "desc"
-      )
-    );
+    const q =
+      query(
+        collection(
+          db,
+          "posts"
+        ),
+        orderBy(
+          "createdAt",
+          "desc"
+        )
+      );
 
-    return onSnapshot(
-      q,
-      (snap) => {
+    const unsub =
+      onSnapshot(
+        q,
+        (snap) => {
 
-        setPosts(
+          setPosts(
 
-          snap.docs.map((d) => {
+            snap.docs.map(
+              (d) => ({
 
-            const data =
-              d.data();
+                id: d.id,
 
-            return {
+                ...d.data()
 
-              id: d.id,
-
-              ...data,
-
-              likes:
-                Array.isArray(data.likes)
-                  ? data.likes
-                  : [],
-
-              reposts:
-                Array.isArray(data.reposts)
-                  ? data.reposts
-                  : [],
-
-              bookmarks:
-                Array.isArray(data.bookmarks)
-                  ? data.bookmarks
-                  : []
-
-            };
-
-          })
-
-        );
-
-      }
-    );
-
-  }, []);
-
-  // ハッシュタグ
-  const renderText = (
-    text: string
-  ) => {
-
-    return text
-      .split(" ")
-      .map((word, i) => {
-
-        if (
-          word.startsWith("#")
-        ) {
-
-          return (
-
-            <Link
-              key={i}
-              href={`/search?q=${encodeURIComponent(word)}`}
-              className="text-sky-500 hover:underline"
-            >
-              {word}{" "}
-            </Link>
+              })
+            )
 
           );
 
         }
+      );
 
-        return word + " ";
+    return () => unsub();
 
-      });
-
-  };
+  }, []);
 
   // 投稿
-  const post = async () => {
+  const createPost =
+    async () => {
 
-    if (!text) return;
+      if (!text.trim())
+        return;
 
-    const userRef =
-      doc(
-        db,
-        "users",
-        user.uid
-      );
+      if (!currentUser)
+        return;
 
-    const userSnap =
-      await getDoc(userRef);
-
-    const userData =
-      userSnap.data();
-
-    await addDoc(
-      collection(db, "posts"),
-      {
-
-        text,
-
-        uid:
-          user.uid,
-
-        name:
-          userData?.name ||
-          "ユーザー",
-
-        username:
-          userData?.username ||
-          "user",
-
-        icon:
-          userData?.icon ||
-          "",
-
-        verified:
-          userData?.verified ||
-          false,
-
-        admin:
-          userData?.admin ||
-          false,
-
-        createdAt:
-          Date.now(),
-
-        likes: [],
-        reposts: [],
-        bookmarks: []
-
-      }
-    );
-
-    setText("");
-
-  };
-
-  // いいね
-  const toggleLike =
-    async (p: any) => {
-
-      const ref =
-        doc(
+      await addDoc(
+        collection(
           db,
-          "posts",
-          p.id
-        );
-
-      const liked =
-        p.likes?.includes(
-          user.uid
-        );
-
-      await updateDoc(
-        ref,
+          "posts"
+        ),
         {
+          uid:
+            user.uid,
 
-          likes: liked
-            ? arrayRemove(user.uid)
-            : arrayUnion(user.uid)
+          name:
+            currentUser.name ||
+            "ユーザー",
 
+          username:
+            currentUser.username ||
+            "user",
+
+          icon:
+            currentUser.icon ||
+            "",
+
+          verified:
+            currentUser.verified ||
+            false,
+
+          adminVerified:
+            currentUser.adminVerified ||
+            false,
+
+          text,
+
+          likes: 0,
+
+          reposts: 0,
+
+          bookmarks: 0,
+
+          createdAt:
+            Date.now()
         }
       );
 
-    };
-
-  // リポスト
-  const toggleRepost =
-    async (p: any) => {
-
-      const ref =
-        doc(
-          db,
-          "posts",
-          p.id
-        );
-
-      const reposted =
-        p.reposts?.includes(
-          user.uid
-        );
-
-      await updateDoc(
-        ref,
-        {
-
-          reposts: reposted
-            ? arrayRemove(user.uid)
-            : arrayUnion(user.uid)
-
-        }
-      );
-
-    };
-
-  // ブックマーク
-  const toggleBookmark =
-    async (p: any) => {
-
-      const ref =
-        doc(
-          db,
-          "posts",
-          p.id
-        );
-
-      const bookmarked =
-        p.bookmarks?.includes(
-          user.uid
-        );
-
-      await updateDoc(
-        ref,
-        {
-
-          bookmarks: bookmarked
-            ? arrayRemove(user.uid)
-            : arrayUnion(user.uid)
-
-        }
-      );
+      setText("");
 
     };
 
@@ -298,178 +185,155 @@ export default function Home() {
     return null;
 
   return (
-    <div className="bg-black text-white min-h-screen">
 
-      {/* 上 */}
-      <div className="sticky top-0 z-50 bg-black/80 backdrop-blur border-b border-zinc-800 p-4">
+    <div className="flex bg-black min-h-screen text-white">
 
-        <h1 className="text-3xl font-bold">
-          ホーム
-        </h1>
+      {/* 左 */}
+      <div className="w-[250px] border-r border-zinc-800 p-4 flex flex-col fixed h-screen">
 
-      </div>
+        {/* ロゴ */}
+        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-black text-3xl font-bold mb-8">
 
-      {/* 投稿欄 */}
-      <div className="border-b border-zinc-800 p-4">
+          C
 
-        <textarea
-          value={text}
-          onChange={(e) =>
-            setText(
-              e.target.value
-            )
-          }
-          placeholder="いまどうしてる？"
-          className="w-full bg-black text-white outline-none resize-none text-xl min-h-[120px]"
-        />
+        </div>
 
-        <div className="flex justify-end">
+        {/* メニュー */}
+        <div className="flex flex-col gap-6 text-2xl">
 
-          <button
-            onClick={post}
-            className="bg-blue-500 hover:bg-blue-600 transition px-6 py-2 rounded-full font-bold"
-          >
-            クリート
-          </button>
+          <Link href="/">
+            🏠 ホーム
+          </Link>
+
+          <Link href="/search">
+            🔎 検索
+          </Link>
+
+          <Link href="/notifications">
+            🔔 通知
+          </Link>
+
+          <Link href={`/user/${user.uid}`}>
+            👤 プロフィール
+          </Link>
+
+          <Link href="/bookmarks">
+            🔖 ブックマーク
+          </Link>
+
+          <Link href="/settings">
+            ⚙️ 設定
+          </Link>
+
+        </div>
+
+        {/* ボタン */}
+        <button
+          onClick={createPost}
+          className="mt-8 bg-blue-500 hover:bg-blue-600 rounded-full py-4 font-bold text-xl"
+        >
+          クリート
+        </button>
+
+        {/* バージョン */}
+        <div className="mt-auto text-zinc-500 text-sm">
+
+          Critter v1.0.1
 
         </div>
 
       </div>
 
-      {/* 投稿一覧 */}
-      {posts.map((p: any) => (
+      {/* 真ん中 */}
+      <div className="ml-[250px] w-[600px] border-r border-zinc-800 min-h-screen">
 
-        <div
-          key={p.id}
-          className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition"
-        >
+        {/* 上 */}
+        <div className="sticky top-0 bg-black/80 backdrop-blur border-b border-zinc-800 p-4 z-50">
 
-          <div className="flex gap-3">
+          <h1 className="text-3xl font-bold">
+            ホーム
+          </h1>
 
-            {/* アイコン */}
-            <Link href={`/user/${p.uid}`}>
+        </div>
 
-              <div className="w-12 h-12 min-w-[48px] min-h-[48px] overflow-hidden rounded-full bg-zinc-700 flex items-center justify-center">
+        {/* 投稿欄 */}
+        <div className="border-b border-zinc-800 p-4">
 
-                {p.icon ? (
+          <textarea
+            placeholder="いまどうしてる？"
+            value={text}
+            onChange={(e)=>
+              setText(
+                e.target.value
+              )
+            }
+            className="w-full bg-black text-white outline-none resize-none text-xl min-h-[120px]"
+          />
 
-                  <img
-                    src={p.icon}
-                    className="w-full h-full object-cover"
-                  />
+          <div className="flex justify-end mt-4">
 
-                ) : (
+            <button
+              onClick={createPost}
+              className="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-full font-bold"
+            >
+              クリート
+            </button>
 
-                  <div className="w-full h-full bg-zinc-700" />
+          </div>
 
-                )}
+        </div>
 
-              </div>
+        {/* 投稿一覧 */}
+        {posts.map((post:any)=>(
 
-            </Link>
+          <PostCard
+            key={post.id}
+            post={post}
+            currentUser={currentUser}
+          />
 
-            <div className="flex-1">
+        ))}
 
-              {/* 名前 */}
-              <Link href={`/user/${p.uid}`}>
+      </div>
 
-                <div className="hover:underline cursor-pointer flex items-center gap-2 flex-wrap">
+      {/* 右 */}
+      <div className="flex-1 p-8">
 
-                  <span className="font-bold">
-                    {p.name}
-                  </span>
+        <div className="bg-zinc-900 rounded-3xl p-6 w-[300px]">
 
-                  {/* 青認証 */}
-                  {p.verified === true && (
+          <div className="text-3xl font-bold mb-6">
 
-                    <img
-                      src="/verified-blue.png"
-                      className="w-5 h-5"
-                    />
+            トレンド
 
-                  )}
+          </div>
 
-                  {/* 金認証 */}
-                  {p.admin === true && (
+          <div className="mb-5">
 
-                    <img
-                      src="/verified-gold.png"
-                      className="w-5 h-5"
-                    />
+            <div className="text-zinc-500 text-sm">
 
-                  )}
+              トレンド
 
-                  <span className="text-zinc-500 ml-1">
-                    @{p.username || "user"}
-                  </span>
+            </div>
 
-                </div>
+            <div className="font-bold text-xl">
 
-              </Link>
+              #AI
 
-              {/* 本文 */}
-              <div className="mt-2 whitespace-pre-wrap text-white">
+            </div>
 
-                {renderText(
-                  p.text
-                )}
+          </div>
 
-              </div>
+          <div>
 
-              {/* ボタン */}
-              <div className="flex gap-8 mt-4 text-zinc-500">
+            <div className="text-zinc-500 text-sm">
 
-                {/* 返信 */}
-                <Link
-                  href={`/post/${p.id}`}
-                  className="hover:text-sky-500"
-                >
-                  💬 0
-                </Link>
+              ゲーム
 
-                {/* リポスト */}
-                <button
-                  onClick={() =>
-                    toggleRepost(p)
-                  }
-                  className={
-                    p.reposts.includes(user.uid)
-                      ? "text-green-500"
-                      : "hover:text-green-500"
-                  }
-                >
-                  🔁 {p.reposts.length}
-                </button>
+            </div>
 
-                {/* いいね */}
-                <button
-                  onClick={() =>
-                    toggleLike(p)
-                  }
-                  className={
-                    p.likes.includes(user.uid)
-                      ? "text-pink-500"
-                      : "hover:text-pink-500"
-                  }
-                >
-                  ❤️ {p.likes.length}
-                </button>
+            <div className="font-bold text-xl">
 
-                {/* ブックマーク */}
-                <button
-                  onClick={() =>
-                    toggleBookmark(p)
-                  }
-                  className={
-                    p.bookmarks.includes(user.uid)
-                      ? "text-yellow-500"
-                      : "hover:text-yellow-500"
-                  }
-                >
-                  🔖 {p.bookmarks.length}
-                </button>
-
-              </div>
+              #Minecraft
 
             </div>
 
@@ -477,8 +341,10 @@ export default function Home() {
 
         </div>
 
-      ))}
+      </div>
 
     </div>
+
   );
+
 }
