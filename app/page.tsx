@@ -36,6 +36,7 @@ export default function Home() {
   const [text, setText] =
     useState("");
 
+  // ログイン確認
   useEffect(() => {
 
     return onAuthStateChanged(
@@ -58,6 +59,7 @@ export default function Home() {
 
   }, []);
 
+  // 投稿取得
   useEffect(() => {
 
     const q = query(
@@ -74,10 +76,29 @@ export default function Home() {
 
         setPosts(
 
-          snap.docs.map((d) => ({
-            id: d.id,
-            ...d.data()
-          }))
+          snap.docs.map((d) => {
+
+            const data =
+              d.data();
+
+            return {
+
+              id: d.id,
+
+              ...data,
+
+              likes:
+                data.likes || [],
+
+              reposts:
+                data.reposts || [],
+
+              bookmarks:
+                data.bookmarks || []
+
+            };
+
+          })
 
         );
 
@@ -130,7 +151,8 @@ export default function Home() {
 
         text,
 
-        uid: user.uid,
+        uid:
+          user.uid,
 
         username:
           user.displayName ||
@@ -155,73 +177,91 @@ export default function Home() {
   };
 
   // いいね
-  const toggleLike = async (
-    p: any
-  ) => {
+  const toggleLike =
+    async (p: any) => {
 
-    const ref =
-      doc(db, "posts", p.id);
+      const ref =
+        doc(
+          db,
+          "posts",
+          p.id
+        );
 
-    const liked =
-      p.likes?.includes(
-        user.uid
+      const liked =
+        p.likes?.includes(
+          user.uid
+        );
+
+      await updateDoc(
+        ref,
+        {
+
+          likes: liked
+            ? arrayRemove(user.uid)
+            : arrayUnion(user.uid)
+
+        }
       );
 
-    await updateDoc(ref, {
-
-      likes: liked
-        ? arrayRemove(user.uid)
-        : arrayUnion(user.uid)
-
-    });
-
-  };
+    };
 
   // リポスト
-  const toggleRepost = async (
-    p: any
-  ) => {
+  const toggleRepost =
+    async (p: any) => {
 
-    const ref =
-      doc(db, "posts", p.id);
+      const ref =
+        doc(
+          db,
+          "posts",
+          p.id
+        );
 
-    const reposted =
-      p.reposts?.includes(
-        user.uid
+      const reposted =
+        p.reposts?.includes(
+          user.uid
+        );
+
+      await updateDoc(
+        ref,
+        {
+
+          reposts: reposted
+            ? arrayRemove(user.uid)
+            : arrayUnion(user.uid)
+
+        }
       );
 
-    await updateDoc(ref, {
-
-      reposts: reposted
-        ? arrayRemove(user.uid)
-        : arrayUnion(user.uid)
-
-    });
-
-  };
+    };
 
   // ブックマーク
-  const toggleBookmark = async (
-    p: any
-  ) => {
+  const toggleBookmark =
+    async (p: any) => {
 
-    const ref =
-      doc(db, "posts", p.id);
+      const ref =
+        doc(
+          db,
+          "posts",
+          p.id
+        );
 
-    const bookmarked =
-      p.bookmarks?.includes(
-        user.uid
+      const bookmarked =
+        p.bookmarks?.includes(
+          user.uid
+        );
+
+      await updateDoc(
+        ref,
+        {
+
+          bookmarks: bookmarked
+            ? arrayRemove(user.uid)
+            : arrayUnion(user.uid)
+
+        }
       );
 
-    await updateDoc(ref, {
-
-      bookmarks: bookmarked
-        ? arrayRemove(user.uid)
-        : arrayUnion(user.uid)
-
-    });
-
-  };
+    };
 
   if (!user)
     return null;
@@ -324,7 +364,7 @@ export default function Home() {
               {/* ボタン */}
               <div className="flex gap-8 mt-4 text-zinc-500">
 
-                {/* リプ */}
+                {/* 返信 */}
                 <Link
                   href={`/post/${p.id}`}
                   className="hover:text-sky-500"
@@ -338,12 +378,12 @@ export default function Home() {
                     toggleRepost(p)
                   }
                   className={
-                    p.reposts?.includes(user.uid)
+                    p.reposts.includes(user.uid)
                       ? "text-green-500"
                       : "hover:text-green-500"
                   }
                 >
-                  🔁 {p.reposts?.length || 0}
+                  🔁 {p.reposts.length}
                 </button>
 
                 {/* いいね */}
@@ -352,12 +392,12 @@ export default function Home() {
                     toggleLike(p)
                   }
                   className={
-                    p.likes?.includes(user.uid)
+                    p.likes.includes(user.uid)
                       ? "text-pink-500"
                       : "hover:text-pink-500"
                   }
                 >
-                  ❤️ {p.likes?.length || 0}
+                  ❤️ {p.likes.length}
                 </button>
 
                 {/* ブックマーク */}
@@ -366,12 +406,12 @@ export default function Home() {
                     toggleBookmark(p)
                   }
                   className={
-                    p.bookmarks?.includes(user.uid)
+                    p.bookmarks.includes(user.uid)
                       ? "text-yellow-500"
                       : "hover:text-yellow-500"
                   }
                 >
-                  🔖 {p.bookmarks?.length || 0}
+                  🔖 {p.bookmarks.length}
                 </button>
 
               </div>
