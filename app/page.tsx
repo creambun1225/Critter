@@ -14,7 +14,11 @@ import {
   addDoc,
   onSnapshot,
   query,
-  orderBy
+  orderBy,
+  doc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove
 } from "firebase/firestore";
 
 import {
@@ -139,10 +143,83 @@ export default function Home() {
         createdAt:
           Date.now(),
 
+        likes: [],
+        reposts: [],
+        bookmarks: []
+
       }
     );
 
     setText("");
+
+  };
+
+  // いいね
+  const toggleLike = async (
+    p: any
+  ) => {
+
+    const ref =
+      doc(db, "posts", p.id);
+
+    const liked =
+      p.likes?.includes(
+        user.uid
+      );
+
+    await updateDoc(ref, {
+
+      likes: liked
+        ? arrayRemove(user.uid)
+        : arrayUnion(user.uid)
+
+    });
+
+  };
+
+  // リポスト
+  const toggleRepost = async (
+    p: any
+  ) => {
+
+    const ref =
+      doc(db, "posts", p.id);
+
+    const reposted =
+      p.reposts?.includes(
+        user.uid
+      );
+
+    await updateDoc(ref, {
+
+      reposts: reposted
+        ? arrayRemove(user.uid)
+        : arrayUnion(user.uid)
+
+    });
+
+  };
+
+  // ブックマーク
+  const toggleBookmark = async (
+    p: any
+  ) => {
+
+    const ref =
+      doc(db, "posts", p.id);
+
+    const bookmarked =
+      p.bookmarks?.includes(
+        user.uid
+      );
+
+    await updateDoc(ref, {
+
+      bookmarks: bookmarked
+        ? arrayRemove(user.uid)
+        : arrayUnion(user.uid)
+
+    });
 
   };
 
@@ -244,13 +321,60 @@ export default function Home() {
 
               </div>
 
-              {/* 詳細 */}
-              <Link
-                href={`/post/${p.id}`}
-                className="text-zinc-500 text-sm hover:underline mt-3 inline-block"
-              >
-                詳細を見る
-              </Link>
+              {/* ボタン */}
+              <div className="flex gap-8 mt-4 text-zinc-500">
+
+                {/* リプ */}
+                <Link
+                  href={`/post/${p.id}`}
+                  className="hover:text-sky-500"
+                >
+                  💬 0
+                </Link>
+
+                {/* リポスト */}
+                <button
+                  onClick={() =>
+                    toggleRepost(p)
+                  }
+                  className={
+                    p.reposts?.includes(user.uid)
+                      ? "text-green-500"
+                      : "hover:text-green-500"
+                  }
+                >
+                  🔁 {p.reposts?.length || 0}
+                </button>
+
+                {/* いいね */}
+                <button
+                  onClick={() =>
+                    toggleLike(p)
+                  }
+                  className={
+                    p.likes?.includes(user.uid)
+                      ? "text-pink-500"
+                      : "hover:text-pink-500"
+                  }
+                >
+                  ❤️ {p.likes?.length || 0}
+                </button>
+
+                {/* ブックマーク */}
+                <button
+                  onClick={() =>
+                    toggleBookmark(p)
+                  }
+                  className={
+                    p.bookmarks?.includes(user.uid)
+                      ? "text-yellow-500"
+                      : "hover:text-yellow-500"
+                  }
+                >
+                  🔖 {p.bookmarks?.length || 0}
+                </button>
+
+              </div>
 
             </div>
 
