@@ -42,7 +42,13 @@ export default function SettingsPage() {
 
     const load = async () => {
 
-      if (!auth.currentUser) return;
+      if (!auth.currentUser) {
+
+        location.href = "/login";
+
+        return;
+
+      }
 
       const snap = await getDoc(
         doc(db, "users", auth.currentUser.uid)
@@ -73,7 +79,7 @@ export default function SettingsPage() {
 
   };
 
-  // 管理者
+  // 管理者権限
   const adminAuth = async () => {
 
     if (password !== "annpannmann") {
@@ -133,7 +139,22 @@ export default function SettingsPage() {
 
       } catch (e: any) {
 
-        alert(e.message);
+        console.log(e);
+
+        if (
+          e.code ===
+          "auth/requires-recent-login"
+        ) {
+
+          alert(
+            "一度ログアウトして再ログインしてください"
+          );
+
+        } else {
+
+          alert(e.message);
+
+        }
 
       }
 
@@ -168,6 +189,7 @@ export default function SettingsPage() {
 
           <div className="bg-zinc-900 rounded-2xl p-4 space-y-4">
 
+            {/* username */}
             <div>
 
               <p className="text-zinc-500 text-sm">
@@ -180,6 +202,7 @@ export default function SettingsPage() {
 
             </div>
 
+            {/* email */}
             <div>
 
               <p className="text-zinc-500 text-sm">
@@ -192,7 +215,7 @@ export default function SettingsPage() {
 
             </div>
 
-            {/* パスワード変更 */}
+            {/* password */}
             <div>
 
               <p className="text-zinc-500 text-sm mb-2">
@@ -208,7 +231,7 @@ export default function SettingsPage() {
                     e.target.value
                   )
                 }
-                className="w-full bg-black border border-zinc-700 rounded-xl p-3"
+                className="w-full bg-black border border-zinc-700 rounded-xl p-3 outline-none"
               />
 
               <button
@@ -222,7 +245,7 @@ export default function SettingsPage() {
 
             </div>
 
-            {/* ブックマーク数 */}
+            {/* bookmark */}
             <div>
 
               <p className="text-zinc-500 text-sm">
@@ -262,7 +285,7 @@ export default function SettingsPage() {
                 )
               }
               placeholder="パスワード"
-              className="w-full bg-black border border-zinc-700 rounded-xl p-3"
+              className="w-full bg-black border border-zinc-700 rounded-xl p-3 outline-none"
             />
 
             <button
@@ -276,6 +299,7 @@ export default function SettingsPage() {
 
         )}
 
+        {/* admin表示 */}
         {isAdmin && (
 
           <div className="bg-green-500/20 border border-green-500 rounded-2xl p-4">
@@ -286,7 +310,7 @@ export default function SettingsPage() {
 
         )}
 
-        {/* ログアウト */}
+        {/* logout */}
         <button
           onClick={logout}
           className="w-full bg-red-500 hover:bg-red-600 transition p-4 rounded-2xl font-bold"
