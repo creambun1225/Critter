@@ -249,7 +249,7 @@ export default function Home() {
                 href={`/post/${p.id}`}
                 className="text-zinc-500 text-sm hover:underline mt-3 inline-block"
               >
-                詳細を見る
+                詳細を見るう
               </Link>
 
             </div>
