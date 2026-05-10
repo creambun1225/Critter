@@ -10,7 +10,8 @@ import {
 import {
   signOut,
   deleteUser,
-  onAuthStateChanged
+  onAuthStateChanged,
+  updatePassword
 } from "firebase/auth";
 
 import {
@@ -22,6 +23,12 @@ export default function SettingsPage() {
 
   const [userData, setUserData] =
     useState<any>(null);
+
+  const [showAccount, setShowAccount] =
+    useState(false);
+
+  const [newPassword, setNewPassword] =
+    useState("");
 
   // ユーザー情報取得
   useEffect(() => {
@@ -55,9 +62,6 @@ export default function SettingsPage() {
             email:
               user.email,
 
-            password:
-              "Firebaseでは取得不可",
-
             ...snap.data()
 
           });
@@ -77,6 +81,47 @@ export default function SettingsPage() {
 
       location.href =
         "/login";
+
+    };
+
+  // パスワード変更
+  const changePassword =
+    async () => {
+
+      if (!newPassword) {
+
+        alert(
+          "新しいパスワード入力して"
+        );
+
+        return;
+
+      }
+
+      try {
+
+        if (auth.currentUser) {
+
+          await updatePassword(
+            auth.currentUser,
+            newPassword
+          );
+
+          alert(
+            "パスワード変更しました"
+          );
+
+          setNewPassword("");
+
+        }
+
+      } catch (e:any) {
+
+        alert(
+          "再ログインしてください"
+        );
+
+      }
 
     };
 
@@ -129,66 +174,93 @@ export default function SettingsPage() {
         設定
       </h1>
 
-      {/* アカウント情報 */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-6">
+      {/* アカウント情報ボタン */}
+      <button
+        onClick={() =>
+          setShowAccount(
+            !showAccount
+          )
+        }
+        className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4"
+      >
+        アカウント情報
+      </button>
 
-        <h2 className="text-xl font-bold mb-4">
-          アカウント情報
-        </h2>
+      {/* 開いた時 */}
+      {showAccount && (
 
-        {/* 名前 */}
-        <div className="mb-4">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-6">
 
-          <div className="text-zinc-500 text-sm">
-            ユーザー名
+          {/* 名前 */}
+          <div className="mb-4">
+
+            <div className="text-zinc-500 text-sm">
+              ユーザー名
+            </div>
+
+            <div className="text-lg">
+              {userData.name}
+            </div>
+
           </div>
 
-          <div className="text-lg">
-            {userData.name}
+          {/* @ */}
+          <div className="mb-4">
+
+            <div className="text-zinc-500 text-sm">
+              @ユーザー名
+            </div>
+
+            <div className="text-lg">
+              @{userData.username}
+            </div>
+
+          </div>
+
+          {/* メール */}
+          <div className="mb-4">
+
+            <div className="text-zinc-500 text-sm">
+              メールアドレス
+            </div>
+
+            <div className="text-lg break-all">
+              {userData.email}
+            </div>
+
+          </div>
+
+          {/* パスワード変更 */}
+          <div>
+
+            <div className="text-zinc-500 text-sm mb-2">
+              パスワード変更
+            </div>
+
+            <input
+              type="password"
+              placeholder="新しいパスワード"
+              value={newPassword}
+              onChange={(e) =>
+                setNewPassword(
+                  e.target.value
+                )
+              }
+              className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-3 text-white"
+            />
+
+            <button
+              onClick={changePassword}
+              className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl"
+            >
+              パスワード変更
+            </button>
+
           </div>
 
         </div>
 
-        {/* @ */}
-        <div className="mb-4">
-
-          <div className="text-zinc-500 text-sm">
-            @ユーザー名
-          </div>
-
-          <div className="text-lg">
-            @{userData.username}
-          </div>
-
-        </div>
-
-        {/* メール */}
-        <div className="mb-4">
-
-          <div className="text-zinc-500 text-sm">
-            メールアドレス
-          </div>
-
-          <div className="text-lg break-all">
-            {userData.email}
-          </div>
-
-        </div>
-
-        {/* パスワード */}
-        <div>
-
-          <div className="text-zinc-500 text-sm">
-            パスワード
-          </div>
-
-          <div className="text-lg">
-            {userData.password}
-          </div>
-
-        </div>
-
-      </div>
+      )}
 
       {/* ログアウト */}
       <button
