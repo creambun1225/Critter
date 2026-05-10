@@ -88,13 +88,19 @@ export default function Home() {
               ...data,
 
               likes:
-                data.likes || [],
+                Array.isArray(data.likes)
+                  ? data.likes
+                  : [],
 
               reposts:
-                data.reposts || [],
+                Array.isArray(data.reposts)
+                  ? data.reposts
+                  : [],
 
               bookmarks:
-                data.bookmarks || []
+                Array.isArray(data.bookmarks)
+                  ? data.bookmarks
+                  : []
 
             };
 
