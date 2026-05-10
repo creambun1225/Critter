@@ -7,7 +7,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 
 import {
-  db
+  db,
+  auth
 } from "@/lib/firebase";
 
 import {
@@ -16,8 +17,13 @@ import {
   collection,
   query,
   where,
-  onSnapshot
+  onSnapshot,
+  updateDoc
 } from "firebase/firestore";
+
+import {
+  onAuthStateChanged
+} from "firebase/auth";
 
 export default function UserPage() {
 
@@ -27,13 +33,51 @@ export default function UserPage() {
   const uid =
     params.uid as string;
 
+  const [me, setMe] =
+    useState<any>(null);
+
   const [userData, setUserData] =
     useState<any>(null);
 
   const [posts, setPosts] =
     useState<any[]>([]);
 
-  // ユーザー取得
+  const [menuOpen, setMenuOpen] =
+    useState(false);
+
+  // 自分
+  useEffect(() => {
+
+    return onAuthStateChanged(
+      auth,
+      async (u) => {
+
+        if (!u) return;
+
+        const snap =
+          await getDoc(
+            doc(
+              db,
+              "users",
+              u.uid
+            )
+          );
+
+        if (snap.exists()) {
+
+          setMe({
+            uid: u.uid,
+            ...snap.data()
+          });
+
+        }
+
+      }
+    );
+
+  }, []);
+
+  // 相手プロフィール
   useEffect(() => {
 
     const load =
@@ -56,6 +100,8 @@ export default function UserPage() {
 
           setUserData({
 
+            uid,
+
             name:
               data.name ||
               "ユーザー",
@@ -70,23 +116,13 @@ export default function UserPage() {
 
             icon:
               data.icon ||
-              ""
+              "",
 
-          });
+            verified:
+              data.verified || false,
 
-        } else {
-
-          setUserData({
-
-            name:
-              "ユーザー",
-
-            username:
-              "user",
-
-            bio: "",
-
-            icon: ""
+            admin:
+              data.admin || false
 
           });
 
@@ -98,7 +134,7 @@ export default function UserPage() {
 
   }, [uid]);
 
-  // 投稿取得
+  // 投稿
   useEffect(() => {
 
     const q = query(
@@ -127,29 +163,22 @@ export default function UserPage() {
 
               return {
 
-                id:
-                  d.id,
+                id: d.id,
 
                 ...data,
 
                 likes:
-                  Array.isArray(
-                    data.likes
-                  )
+                  Array.isArray(data.likes)
                     ? data.likes
                     : [],
 
                 reposts:
-                  Array.isArray(
-                    data.reposts
-                  )
+                  Array.isArray(data.reposts)
                     ? data.reposts
                     : [],
 
                 bookmarks:
-                  Array.isArray(
-                    data.bookmarks
-                  )
+                  Array.isArray(data.bookmarks)
                     ? data.bookmarks
                     : []
 
@@ -165,6 +194,30 @@ export default function UserPage() {
 
   }, [uid]);
 
+  // 認証付与
+  const verifyUser =
+    async () => {
+
+      await updateDoc(
+        doc(
+          db,
+          "users",
+          uid
+        ),
+        {
+          verified: true
+        }
+      );
+
+      setUserData({
+        ...userData,
+        verified: true
+      });
+
+      setMenuOpen(false);
+
+    };
+
   if (!userData)
     return (
       <div className="text-white p-6">
@@ -177,7 +230,41 @@ export default function UserPage() {
     <div className="bg-black min-h-screen text-white">
 
       {/* ヘッダー */}
-      <div className="h-36 bg-zinc-700" />
+      <div className="h-36 bg-zinc-700 relative">
+
+        {/* 管理者用 */}
+        {me?.admin && (
+
+          <button
+            onClick={() =>
+              setMenuOpen(
+                !menuOpen
+              )
+            }
+            className="absolute top-4 right-4 text-2xl"
+          >
+            ⋯
+          </button>
+
+        )}
+
+        {/* メニュー */}
+        {menuOpen && (
+
+          <div className="absolute top-14 right-4 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden z-50">
+
+            <button
+              onClick={verifyUser}
+              className="block px-4 py-3 hover:bg-zinc-800 w-full text-left"
+            >
+              ✔️ 認証マークを付ける
+            </button>
+
+          </div>
+
+        )}
+
+      </div>
 
       {/* プロフィール */}
       <div className="p-4">
@@ -201,13 +288,35 @@ export default function UserPage() {
         </div>
 
         {/* 名前 */}
-        <h1 className="text-3xl font-bold mt-4">
+        <div className="flex items-center gap-2 mt-4">
 
-          {userData.name}
+          <h1 className="text-3xl font-bold">
 
-        </h1>
+            {userData.name}
 
-        {/* ユーザー名 */}
+          </h1>
+
+          {/* 青認証 */}
+          {userData.verified && (
+
+            <div className="text-sky-500 text-2xl">
+              ✔️
+            </div>
+
+          )}
+
+          {/* 金認証 */}
+          {userData.admin && (
+
+            <div className="text-yellow-400 text-2xl">
+              👑
+            </div>
+
+          )}
+
+        </div>
+
+        {/* @ */}
         <p className="text-zinc-500">
 
           @{userData.username}
@@ -223,7 +332,7 @@ export default function UserPage() {
 
       </div>
 
-      {/* 投稿一覧 */}
+      {/* 投稿 */}
       <div className="mt-6">
 
         {posts.map((p: any) => (
@@ -254,9 +363,29 @@ export default function UserPage() {
                 <div>
 
                   {/* 名前 */}
-                  <div className="font-bold">
+                  <div className="flex items-center gap-2">
 
-                    {p.name || "ユーザー"}
+                    <div className="font-bold">
+
+                      {p.name || "ユーザー"}
+
+                    </div>
+
+                    {p.verified && (
+
+                      <div className="text-sky-500">
+                        ✔️
+                      </div>
+
+                    )}
+
+                    {p.admin && (
+
+                      <div className="text-yellow-400">
+                        👑
+                      </div>
+
+                    )}
 
                   </div>
 
