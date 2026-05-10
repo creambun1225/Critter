@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState
+} from "react";
 
 import Link from "next/link";
 
@@ -17,7 +21,7 @@ import {
   onSnapshot
 } from "firebase/firestore";
 
-export default function SearchPage() {
+function SearchContent() {
 
   const searchParams =
     useSearchParams();
@@ -141,15 +145,11 @@ export default function SearchPage() {
               </Link>
 
               {/* 本文 */}
-              <Link href={`/post/${p.id}`}>
+              <p className="mt-2 whitespace-pre-wrap">
 
-                <p className="mt-2 whitespace-pre-wrap">
+                {p.text}
 
-                  {p.text}
-
-                </p>
-
-              </Link>
+              </p>
 
             </div>
 
@@ -161,4 +161,18 @@ export default function SearchPage() {
 
     </div>
   );
+}
+
+export default function SearchPage() {
+
+  return (
+
+    <Suspense fallback={<div />}>
+
+      <SearchContent />
+
+    </Suspense>
+
+  );
+
 }
