@@ -171,7 +171,7 @@ export default function Home() {
               e.target.value
             )
           }
-          placeholder="いまどうしてる？"
+          placeholder="いまどうしてるんだい？"
           className="w-full bg-black text-white outline-none resize-none text-xl min-h-[120px]"
         />
 
@@ -249,7 +249,7 @@ export default function Home() {
                 href={`/post/${p.id}`}
                 className="text-zinc-500 text-sm hover:underline mt-3 inline-block"
               >
-                詳細を見るう
+                詳細を見る
               </Link>
 
             </div>
