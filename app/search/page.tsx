@@ -19,18 +19,16 @@ import {
 
 export default function SearchPage() {
 
-  const searchParams = useSearchParams();
+  const searchParams =
+    useSearchParams();
 
-  const initial =
+  const q =
     searchParams.get("q") || "";
 
-  const [queryText, setQueryText] =
-    useState(initial);
+  const [search, setSearch] =
+    useState(q);
 
   const [posts, setPosts] =
-    useState<any[]>([]);
-
-  const [filtered, setFiltered] =
     useState<any[]>([]);
 
   useEffect(() => {
@@ -39,51 +37,57 @@ export default function SearchPage() {
       collection(db, "posts"),
       (snap) => {
 
-        const loaded = snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data()
-        }));
+        setPosts(
 
-        setPosts(loaded);
+          snap.docs.map((d) => ({
+            id: d.id,
+            ...d.data()
+          }))
+
+        );
 
       }
     );
 
   }, []);
 
-  useEffect(() => {
+  const filtered = posts.filter(
+    (p: any) => {
 
-    const q =
-      queryText.toLowerCase();
+      const s =
+        search.toLowerCase();
 
-    setFiltered(
+      return (
+        p.text
+          ?.toLowerCase()
+          .includes(s) ||
 
-      posts.filter((p: any) =>
+        p.username
+          ?.toLowerCase()
+          .includes(s) ||
 
-        p.text?.toLowerCase().includes(q) ||
+        p.name
+          ?.toLowerCase()
+          .includes(s)
+      );
 
-        p.username?.toLowerCase().includes(q) ||
-
-        p.name?.toLowerCase().includes(q)
-
-      )
-
-    );
-
-  }, [queryText, posts]);
+    }
+  );
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="bg-black text-white min-h-screen">
 
       {/* 上 */}
       <div className="sticky top-0 z-50 bg-black/80 backdrop-blur border-b border-zinc-800 p-4">
 
         <input
-          placeholder="検索"
-          value={queryText}
+          value={search}
           onChange={(e) =>
-            setQueryText(e.target.value)
+            setSearch(
+              e.target.value
+            )
           }
+          placeholder="検索"
           className="w-full bg-zinc-900 rounded-full px-5 py-3 outline-none"
         />
 
@@ -94,10 +98,10 @@ export default function SearchPage() {
 
         <div
           key={p.id}
-          className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition"
+          className="border-b border-zinc-800 p-4"
         >
 
-          <div className="flex gap-4">
+          <div className="flex gap-3">
 
             {/* アイコン */}
             <Link href={`/user/${p.uid}`}>
@@ -106,12 +110,12 @@ export default function SearchPage() {
 
                 <img
                   src={p.icon}
-                  className="w-12 h-12 rounded-full object-cover cursor-pointer"
+                  className="w-12 h-12 rounded-full object-cover"
                 />
 
               ) : (
 
-                <div className="w-12 h-12 rounded-full bg-zinc-700 cursor-pointer" />
+                <div className="w-12 h-12 rounded-full bg-zinc-700" />
 
               )}
 
@@ -122,15 +126,15 @@ export default function SearchPage() {
               {/* 名前 */}
               <Link href={`/user/${p.uid}`}>
 
-                <div className="flex items-center gap-2 hover:underline cursor-pointer">
+                <div className="hover:underline cursor-pointer">
 
-                  <p className="font-bold">
+                  <span className="font-bold">
                     {p.name}
-                  </p>
+                  </span>
 
-                  <p className="text-zinc-500">
+                  <span className="text-zinc-500 ml-2">
                     @{p.username}
-                  </p>
+                  </span>
 
                 </div>
 
@@ -139,8 +143,10 @@ export default function SearchPage() {
               {/* 本文 */}
               <Link href={`/post/${p.id}`}>
 
-                <p className="mt-2 whitespace-pre-wrap hover:underline">
+                <p className="mt-2 whitespace-pre-wrap">
+
                   {p.text}
+
                 </p>
 
               </Link>
