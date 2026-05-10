@@ -91,7 +91,7 @@ export default function RootLayout({
             {/* 下 */}
             <div className="mt-auto pt-6 text-zinc-500 text-sm">
 
-              Critter v1.0.0
+              Critter v1.0.1
 
             </div>
 
