@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import Link from "next/link";
 
 import {
@@ -18,7 +17,8 @@ import {
   doc,
   updateDoc,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  getDoc
 } from "firebase/firestore";
 
 import {
@@ -151,6 +151,19 @@ export default function Home() {
 
     if (!text) return;
 
+    const userRef =
+      doc(
+        db,
+        "users",
+        user.uid
+      );
+
+    const userSnap =
+      await getDoc(userRef);
+
+    const userData =
+      userSnap.data();
+
     await addDoc(
       collection(db, "posts"),
       {
@@ -160,13 +173,25 @@ export default function Home() {
         uid:
           user.uid,
 
-        username:
-          user.displayName ||
-          user.email,
-
         name:
-          user.displayName ||
+          userData?.name ||
           "ユーザー",
+
+        username:
+          userData?.username ||
+          "user",
+
+        icon:
+          userData?.icon ||
+          "",
+
+        verified:
+          userData?.verified ||
+          false,
+
+        admin:
+          userData?.admin ||
+          false,
 
         createdAt:
           Date.now(),
@@ -328,12 +353,12 @@ export default function Home() {
 
                 <img
                   src={p.icon}
-                  className="w-12 h-12 rounded-full object-cover cursor-pointer"
+                  className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full object-cover bg-zinc-700 cursor-pointer"
                 />
 
               ) : (
 
-                <div className="w-12 h-12 rounded-full bg-zinc-700 cursor-pointer" />
+                <div className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-zinc-700 cursor-pointer" />
 
               )}
 
@@ -344,14 +369,34 @@ export default function Home() {
               {/* 名前 */}
               <Link href={`/user/${p.uid}`}>
 
-                <div className="hover:underline cursor-pointer">
+                <div className="hover:underline cursor-pointer flex items-center gap-2">
 
                   <span className="font-bold">
                     {p.name}
                   </span>
 
-                  <span className="text-zinc-500 ml-2">
-                    @{p.username}
+                  {/* 青認証 */}
+                  {p.verified && (
+
+                    <img
+                      src="/verified-blue.png"
+                      className="w-5 h-5"
+                    />
+
+                  )}
+
+                  {/* 金認証 */}
+                  {p.admin && (
+
+                    <img
+                      src="/verified-gold.png"
+                      className="w-5 h-5"
+                    />
+
+                  )}
+
+                  <span className="text-zinc-500 ml-1">
+                    @{p.username || "user"}
                   </span>
 
                 </div>
