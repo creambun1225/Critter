@@ -17,7 +17,9 @@ import {
   orderBy,
   doc,
   runTransaction,
-  getDoc
+  getDoc,
+  updateDoc,
+  deleteDoc
 } from "firebase/firestore";
 
 import {
@@ -34,7 +36,8 @@ export default function Home() {
 
   const [profile, setProfile] = useState<any>(null);
 
-  // ログイン
+  const [admin, setAdmin] = useState(false);
+
   useEffect(() => {
 
     return onAuthStateChanged(auth, async (u) => {
@@ -55,6 +58,10 @@ export default function Home() {
 
           setProfile(snap.data());
 
+          setAdmin(
+            snap.data()?.admin || false
+          );
+
         }
 
       }
@@ -63,7 +70,6 @@ export default function Home() {
 
   }, []);
 
-  // 投稿取得
   useEffect(() => {
 
     const q = query(
@@ -95,7 +101,9 @@ export default function Home() {
 
       uid: user.uid,
 
-      username: profile?.name || "user",
+      username: profile?.username || "user",
+
+      name: profile?.name || "user",
 
       icon: profile?.icon || "",
 
@@ -139,6 +147,76 @@ export default function Home() {
 
   };
 
+  // ブックマーク
+  const bookmark = async (postId: string) => {
+
+    const ref = doc(db, "users", user.uid);
+
+    const snap = await getDoc(ref);
+
+    const data: any = snap.data();
+
+    const bookmarks = data.bookmarks || [];
+
+    if (bookmarks.includes(postId)) {
+
+      await updateDoc(ref, {
+        bookmarks: bookmarks.filter(
+          (id: string) => id !== postId
+        )
+      });
+
+    } else {
+
+      await updateDoc(ref, {
+        bookmarks: [
+          ...bookmarks,
+          postId
+        ]
+      });
+
+    }
+
+  };
+
+  // 通報
+  const reportPost = async (p: any) => {
+
+    await addDoc(collection(db, "reports"), {
+
+      postId: p.id,
+
+      text: p.text,
+
+      username: p.username,
+
+      uid: p.uid,
+
+      reportedBy: user.uid,
+
+      createdAt: Date.now()
+
+    });
+
+    alert("通報しました");
+
+  };
+
+  // 削除
+  const deletePost = async (postId: string) => {
+
+    const ok = confirm(
+      "削除しますか？"
+    );
+
+    if (!ok) return;
+
+    await deleteDoc(
+      doc(db, "posts", postId)
+    );
+
+  };
+
   if (!user || !profile) {
 
     return (
@@ -166,7 +244,6 @@ export default function Home() {
 
         <div className="flex gap-4">
 
-          {/* アイコン */}
           {profile.icon ? (
 
             <img
@@ -180,7 +257,6 @@ export default function Home() {
 
           )}
 
-          {/* 入力 */}
           <div className="flex-1">
 
             <textarea
@@ -219,7 +295,6 @@ export default function Home() {
 
           <div className="flex gap-4">
 
-            {/* アイコン */}
             {p.icon ? (
 
               <img
@@ -233,18 +308,62 @@ export default function Home() {
 
             )}
 
-            {/* 本文 */}
             <div className="flex-1">
 
-              <div className="flex items-center gap-2">
+              {/* 上 */}
+              <div className="flex justify-between">
 
-                <p className="font-bold">
-                  {p.username}
-                </p>
+                <Link href={`/user/${p.uid}`}>
 
-                <p className="text-zinc-500">
-                  @{p.username}
-                </p>
+                  <div className="flex items-center gap-2 hover:underline cursor-pointer">
+
+                    <p className="font-bold">
+                      {p.name}
+                    </p>
+
+                    <p className="text-zinc-500">
+                      @{p.username}
+                    </p>
+
+                  </div>
+
+                </Link>
+
+                <details className="relative">
+
+                  <summary className="cursor-pointer list-none text-zinc-500 hover:text-white">
+
+                    ⋯
+
+                  </summary>
+
+                  <div className="absolute right-0 mt-2 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden w-48 z-50">
+
+                    <button
+                      onClick={() =>
+                        reportPost(p)
+                      }
+                      className="w-full text-left px-4 py-3 hover:bg-zinc-800 transition"
+                    >
+                      このクリートを通報
+                    </button>
+
+                    {(p.uid === user.uid || admin) && (
+
+                      <button
+                        onClick={() =>
+                          deletePost(p.id)
+                        }
+                        className="w-full text-left px-4 py-3 hover:bg-red-500/20 text-red-500 transition"
+                      >
+                        削除
+                      </button>
+
+                    )}
+
+                  </div>
+
+                </details>
 
               </div>
 
@@ -259,9 +378,13 @@ export default function Home() {
               {/* ボタン */}
               <div className="flex gap-8 mt-4 text-zinc-500">
 
-                <button className="hover:text-sky-500 transition">
-                  💬
-                </button>
+                <Link href={`/post/${p.id}`}>
+
+                  <button className="hover:text-sky-500 transition">
+                    💬
+                  </button>
+
+                </Link>
 
                 <button className="hover:text-green-500 transition">
                   🔁
@@ -276,6 +399,15 @@ export default function Home() {
                   }
                 >
                   ❤️ {p.likes}
+                </button>
+
+                <button
+                  onClick={() =>
+                    bookmark(p.id)
+                  }
+                  className="hover:text-yellow-500 transition"
+                >
+                  🔖
                 </button>
 
               </div>
