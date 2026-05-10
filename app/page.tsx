@@ -188,7 +188,7 @@ export default function Home() {
 
       </div>
 
-      {/* 投稿 */}
+      {/* 投稿一覧 */}
       {posts.map((p: any) => (
 
         <div
@@ -236,16 +236,20 @@ export default function Home() {
               </Link>
 
               {/* 本文 */}
-              <Link href={`/post/${p.id}`}>
+              <div className="mt-2 whitespace-pre-wrap text-white">
 
-                <p className="mt-2 whitespace-pre-wrap">
+                {renderText(
+                  p.text
+                )}
 
-                  {renderText(
-                    p.text
-                  )}
+              </div>
 
-                </p>
-
+              {/* 詳細 */}
+              <Link
+                href={`/post/${p.id}`}
+                className="text-zinc-500 text-sm hover:underline mt-3 inline-block"
+              >
+                詳細を見る
               </Link>
 
             </div>
