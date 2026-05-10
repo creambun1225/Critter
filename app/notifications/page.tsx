@@ -1,175 +1,187 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import Link from "next/link";
 
 import {
-  auth,
   db
 } from "@/lib/firebase";
 
 import {
-  onAuthStateChanged
-} from "firebase/auth";
-
-import {
-  collection,
-  onSnapshot,
-  query,
-  orderBy
+  doc,
+  deleteDoc,
+  addDoc,
+  collection
 } from "firebase/firestore";
 
-export default function NotificationsPage() {
+export default function PostCard({
+  post,
+  currentUser
+}:any) {
 
-  const [user, setUser] =
-    useState<any>(null);
+  const [open, setOpen] =
+    useState(false);
 
-  const [reports, setReports] =
-    useState<any[]>([]);
+  // 通報
+  const reportPost =
+    async () => {
 
-  const [loading, setLoading] =
-    useState(true);
-
-  // ログイン確認
-  useEffect(() => {
-
-    return onAuthStateChanged(
-      auth,
-      (u) => {
-
-        if (!u) {
-
-          location.href =
-            "/login";
-
-          return;
-
-        }
-
-        setUser(u);
-
-      }
-    );
-
-  }, []);
-
-  // 通報取得
-  useEffect(() => {
-
-    if (!user) return;
-
-    const q = query(
-      collection(
-        db,
-        "reports"
-      ),
-      orderBy(
-        "createdAt",
-        "desc"
-      )
-    );
-
-    const unsub =
-      onSnapshot(
-        q,
-        (snap) => {
-
-          setReports(
-
-            snap.docs.map(
-              (d) => ({
-
-                id: d.id,
-
-                ...d.data()
-
-              })
-            )
-
-          );
-
-          setLoading(false);
-
+      await addDoc(
+        collection(
+          db,
+          "reports"
+        ),
+        {
+          postId: post.id,
+          text: post.text,
+          createdAt:
+            Date.now()
         }
       );
 
-    return () => unsub();
+      alert(
+        "通報しました"
+      );
 
-  }, [user]);
+      setOpen(false);
 
-  if (!user)
-    return null;
+    };
+
+  // 削除
+  const deletePost =
+    async () => {
+
+      await deleteDoc(
+        doc(
+          db,
+          "posts",
+          post.id
+        )
+      );
+
+    };
+
+  const canDelete =
+    currentUser?.uid ===
+      post.uid ||
+    currentUser?.isAdmin;
 
   return (
 
-    <div className="bg-black min-h-screen text-white">
+    <div className="border-b border-zinc-800 p-4">
 
       {/* 上 */}
-      <div className="sticky top-0 z-50 bg-black/80 backdrop-blur border-b border-zinc-800 p-4">
+      <div className="flex justify-between">
 
-        <h1 className="text-3xl font-bold">
-          通知
-        </h1>
+        <Link
+          href={`/user/${post.uid}`}
+          className="flex gap-3"
+        >
+
+          {/* アイコン */}
+          <img
+            src={
+              post.icon ||
+              "/default.png"
+            }
+            className="w-12 h-12 rounded-full object-cover"
+          />
+
+          <div>
+
+            {/* 名前 */}
+            <div className="flex items-center gap-2">
+
+              <div className="font-bold text-white">
+
+                {post.name}
+
+              </div>
+
+              {/* 認証 */}
+              {post.verified && (
+
+                <img
+                  src="/verified.png"
+                  className="w-5 h-5"
+                />
+
+              )}
+
+              {/* 管理者 */}
+              {post.adminVerified && (
+
+                <img
+                  src="/admin.png"
+                  className="w-5 h-5"
+                />
+
+              )}
+
+            </div>
+
+            {/* username */}
+            <div className="text-zinc-500">
+
+              @{post.username}
+
+            </div>
+
+          </div>
+
+        </Link>
+
+        {/* 詳細 */}
+        <div className="relative">
+
+          <button
+            onClick={()=>
+              setOpen(!open)
+            }
+            className="text-zinc-400 text-xl"
+          >
+            ⋯
+          </button>
+
+          {open && (
+
+            <div className="absolute right-0 top-8 bg-black border border-zinc-700 rounded-xl overflow-hidden w-56 z-50">
+
+              {/* 通報 */}
+              <button
+                onClick={reportPost}
+                className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-400"
+              >
+                このクリートを通報
+              </button>
+
+              {/* 削除 */}
+              {canDelete && (
+
+                <button
+                  onClick={deletePost}
+                  className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-500 border-t border-zinc-800"
+                >
+                  クリートを削除
+                </button>
+
+              )}
+
+            </div>
+
+          )}
+
+        </div>
 
       </div>
 
-      {/* ロード */}
-      {loading && (
+      {/* 本文 */}
+      <div className="mt-4 whitespace-pre-wrap text-white text-[17px]">
 
-        <div className="p-6 text-zinc-400">
+        {post.text}
 
-          loading...
-
-        </div>
-
-      )}
-
-      {/* 通報一覧 */}
-      {!loading && reports.length === 0 && (
-
-        <div className="p-6 text-zinc-500">
-
-          通知はありません
-
-        </div>
-
-      )}
-
-      {/* 通報 */}
-      {reports.map((r:any) => (
-
-        <div
-          key={r.id}
-          className="border-b border-zinc-800 p-4"
-        >
-
-          <div className="text-red-500 font-bold">
-
-            🚨 通報されたクリート
-
-          </div>
-
-          <div className="mt-3 whitespace-pre-wrap">
-
-            {r.text}
-
-          </div>
-
-          <div className="mt-4">
-
-            <Link
-              href={`/post/${r.postId}`}
-              className="text-sky-500 hover:underline"
-            >
-              クリートを見る
-            </Link>
-
-          </div>
-
-        </div>
-
-      ))}
+      </div>
 
     </div>
 
