@@ -1,15 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { useParams } from "next/navigation";
-
 import Link from "next/link";
 
-import {
-  db,
-  auth
-} from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 
 import {
   doc,
@@ -21,209 +16,153 @@ import {
   updateDoc
 } from "firebase/firestore";
 
-import {
-  onAuthStateChanged
-} from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function UserPage() {
 
-  const params =
-    useParams();
+  const params = useParams();
+  const uid = params.uid as string;
 
-  const uid =
-    params.uid as string;
-
-  const [me, setMe] =
-    useState<any>(null);
-
-  const [userData, setUserData] =
-    useState<any>(null);
-
-  const [posts, setPosts] =
-    useState<any[]>([]);
-
-  const [menuOpen, setMenuOpen] =
-    useState(false);
+  const [me, setMe] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // 自分
   useEffect(() => {
 
-    return onAuthStateChanged(
-      auth,
-      async (u) => {
+    return onAuthStateChanged(auth, async (u) => {
 
-        if (!u) return;
+      if (!u) return;
 
-        const snap =
-          await getDoc(
-            doc(
-              db,
-              "users",
-              u.uid
-            )
-          );
+      const snap = await getDoc(
+        doc(db, "users", u.uid)
+      );
 
-        if (snap.exists()) {
+      if (snap.exists()) {
 
-          setMe({
-            uid: u.uid,
-            ...snap.data()
-          });
-
-        }
+        setMe({
+          uid: u.uid,
+          ...snap.data()
+        });
 
       }
-    );
+
+    });
 
   }, []);
 
   // 相手プロフィール
   useEffect(() => {
 
-    const load =
-      async () => {
+    const load = async () => {
 
-        const ref =
-          doc(
-            db,
-            "users",
-            uid
-          );
+      const ref = doc(db, "users", uid);
 
-        const snap =
-          await getDoc(ref);
+      const snap = await getDoc(ref);
 
-        if (snap.exists()) {
+      if (snap.exists()) {
 
-          const data =
-            snap.data();
+        const data = snap.data();
 
-          setUserData({
+        setUserData({
 
-            uid,
+          uid,
 
-            name:
-              data.name ||
-              "ユーザー",
+          name: data.name || "ユーザー",
 
-            username:
-              data.username ||
-              "user",
+          username: data.username || "user",
 
-            bio:
-              data.bio ||
-              "",
+          bio: data.bio || "",
 
-            icon:
-              data.icon ||
-              "",
+          icon: data.icon || "",
 
-            verified:
-              data.verified || false,
+          verified: data.verified || false,
 
-            admin:
-              data.admin || false
+          admin: data.admin || false
 
-          });
+        });
 
-        }
+      }
 
-      };
+    };
 
     load();
 
   }, [uid]);
 
-  // 投稿
+  // 投稿取得
   useEffect(() => {
 
     const q = query(
-      collection(
-        db,
-        "posts"
-      ),
-      where(
-        "uid",
-        "==",
-        uid
-      )
+      collection(db, "posts"),
+      where("uid", "==", uid)
     );
 
-    return onSnapshot(
-      q,
-      (snap) => {
+    return onSnapshot(q, (snap) => {
 
-        setPosts(
+      setPosts(
 
-          snap.docs.map(
-            (d) => {
+        snap.docs.map((d) => {
 
-              const data =
-                d.data();
+          const data = d.data();
 
-              return {
+          return {
 
-                id: d.id,
+            id: d.id,
 
-                ...data,
+            ...data,
 
-                likes:
-                  Array.isArray(data.likes)
-                    ? data.likes
-                    : [],
+            likes: Array.isArray(data.likes)
+              ? data.likes
+              : [],
 
-                reposts:
-                  Array.isArray(data.reposts)
-                    ? data.reposts
-                    : [],
+            reposts: Array.isArray(data.reposts)
+              ? data.reposts
+              : [],
 
-                bookmarks:
-                  Array.isArray(data.bookmarks)
-                    ? data.bookmarks
-                    : []
+            bookmarks: Array.isArray(data.bookmarks)
+              ? data.bookmarks
+              : []
 
-              };
+          };
 
-            }
-          )
+        })
 
-        );
+      );
 
-      }
-    );
+    });
 
   }, [uid]);
 
   // 認証付与
-  const verifyUser =
-    async () => {
+  const verifyUser = async () => {
 
-      await updateDoc(
-        doc(
-          db,
-          "users",
-          uid
-        ),
-        {
-          verified: true
-        }
-      );
-
-      setUserData({
-        ...userData,
+    await updateDoc(
+      doc(db, "users", uid),
+      {
         verified: true
-      });
+      }
+    );
 
-      setMenuOpen(false);
+    setUserData({
+      ...userData,
+      verified: true
+    });
 
-    };
+    setMenuOpen(false);
 
-  if (!userData)
+  };
+
+  if (!userData) {
+
     return (
       <div className="text-white p-6">
         loading...
       </div>
     );
+
+  }
 
   return (
 
@@ -232,16 +171,14 @@ export default function UserPage() {
       {/* ヘッダー */}
       <div className="h-36 bg-zinc-700 relative">
 
-        {/* 管理者用 */}
+        {/* 管理者メニュー */}
         {me?.admin && (
 
           <button
             onClick={() =>
-              setMenuOpen(
-                !menuOpen
-              )
+              setMenuOpen(!menuOpen)
             }
-            className="absolute top-4 right-4 text-2xl"
+            className="absolute top-4 right-4 text-3xl"
           >
             ⋯
           </button>
@@ -251,7 +188,7 @@ export default function UserPage() {
         {/* メニュー */}
         {menuOpen && (
 
-          <div className="absolute top-14 right-4 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden z-50">
+          <div className="absolute top-16 right-4 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden z-50">
 
             <button
               onClick={verifyUser}
@@ -299,25 +236,27 @@ export default function UserPage() {
           {/* 青認証 */}
           {userData.verified && (
 
-            <div className="text-sky-500 text-2xl">
-              ✔️
-            </div>
+            <img
+              src="/verified-blue.png"
+              className="w-7 h-7"
+            />
 
           )}
 
           {/* 金認証 */}
           {userData.admin && (
 
-            <div className="text-yellow-400 text-2xl">
-              👑
-            </div>
+            <img
+              src="/verified-gold.png"
+              className="w-7 h-7"
+            />
 
           )}
 
         </div>
 
         {/* @ */}
-        <p className="text-zinc-500">
+        <p className="text-zinc-500 text-lg">
 
           @{userData.username}
 
@@ -332,7 +271,7 @@ export default function UserPage() {
 
       </div>
 
-      {/* 投稿 */}
+      {/* 投稿一覧 */}
       <div className="mt-6">
 
         {posts.map((p: any) => (
@@ -360,30 +299,34 @@ export default function UserPage() {
 
                 )}
 
-                <div>
+                <div className="flex-1">
 
                   {/* 名前 */}
                   <div className="flex items-center gap-2">
 
-                    <div className="font-bold">
+                    <div className="font-bold text-lg">
 
                       {p.name || "ユーザー"}
 
                     </div>
 
+                    {/* 青認証 */}
                     {p.verified && (
 
-                      <div className="text-sky-500">
-                        ✔️
-                      </div>
+                      <img
+                        src="/verified-blue.png"
+                        className="w-5 h-5"
+                      />
 
                     )}
 
+                    {/* 金認証 */}
                     {p.admin && (
 
-                      <div className="text-yellow-400">
-                        👑
-                      </div>
+                      <img
+                        src="/verified-gold.png"
+                        className="w-5 h-5"
+                      />
 
                     )}
 
