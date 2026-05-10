@@ -8,7 +8,8 @@ import {
 } from "@/lib/firebase";
 
 import {
-  signOut
+  signOut,
+  updatePassword
 } from "firebase/auth";
 
 import {
@@ -25,10 +26,10 @@ export default function SettingsPage() {
   const [showAccount, setShowAccount] =
     useState(false);
 
-  const [showPassword, setShowPassword] =
-    useState(false);
-
   const [password, setPassword] =
+    useState("");
+
+  const [newPassword, setNewPassword] =
     useState("");
 
   const [isAdmin, setIsAdmin] =
@@ -63,6 +64,7 @@ export default function SettingsPage() {
 
   }, []);
 
+  // ログアウト
   const logout = async () => {
 
     await signOut(auth);
@@ -71,6 +73,7 @@ export default function SettingsPage() {
 
   };
 
+  // 管理者
   const adminAuth = async () => {
 
     if (password !== "annpannmann") {
@@ -95,6 +98,46 @@ export default function SettingsPage() {
     alert("管理者権限を付与しました");
 
   };
+
+  // パスワード変更
+  const changePassword =
+    async () => {
+
+      if (!auth.currentUser)
+        return;
+
+      if (
+        newPassword.length < 6
+      ) {
+
+        alert(
+          "6文字以上にしてください"
+        );
+
+        return;
+
+      }
+
+      try {
+
+        await updatePassword(
+          auth.currentUser,
+          newPassword
+        );
+
+        alert(
+          "パスワード変更完了"
+        );
+
+        setNewPassword("");
+
+      } catch (e: any) {
+
+        alert(e.message);
+
+      }
+
+    };
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -149,33 +192,37 @@ export default function SettingsPage() {
 
             </div>
 
+            {/* パスワード変更 */}
             <div>
 
-              <p className="text-zinc-500 text-sm">
-                パスワード
+              <p className="text-zinc-500 text-sm mb-2">
+                パスワード変更
               </p>
 
-              <div className="flex items-center gap-3">
+              <input
+                type="password"
+                placeholder="新しいパスワード"
+                value={newPassword}
+                onChange={(e) =>
+                  setNewPassword(
+                    e.target.value
+                  )
+                }
+                className="w-full bg-black border border-zinc-700 rounded-xl p-3"
+              />
 
-                <p>
-                  {showPassword
-                    ? "Firebaseでは現在のパスワードは取得できません"
-                    : "••••••••"}
-                </p>
-
-                <button
-                  onClick={() =>
-                    setShowPassword(!showPassword)
-                  }
-                  className="text-blue-500 text-sm"
-                >
-                  表示
-                </button>
-
-              </div>
+              <button
+                onClick={
+                  changePassword
+                }
+                className="mt-3 bg-blue-500 hover:bg-blue-600 transition px-5 py-2 rounded-full font-bold"
+              >
+                変更
+              </button>
 
             </div>
 
+            {/* ブックマーク数 */}
             <div>
 
               <p className="text-zinc-500 text-sm">
@@ -183,7 +230,8 @@ export default function SettingsPage() {
               </p>
 
               <p>
-                {profile.bookmarks?.length || 0}件
+                {profile.bookmarks
+                  ?.length || 0}件
               </p>
 
             </div>
@@ -209,7 +257,9 @@ export default function SettingsPage() {
             <input
               value={password}
               onChange={(e) =>
-                setPassword(e.target.value)
+                setPassword(
+                  e.target.value
+                )
               }
               placeholder="パスワード"
               className="w-full bg-black border border-zinc-700 rounded-xl p-3"
