@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
+import PostCard from "@/components/PostCard";
+
 import {
   auth,
   db
@@ -15,15 +17,13 @@ import {
 
 import {
   collection,
-  addDoc,
-  onSnapshot,
   query,
   orderBy,
+  onSnapshot,
+  addDoc,
   doc,
   getDoc
 } from "firebase/firestore";
-
-import PostCard from "@/components/PostCard";
 
 export default function HomePage() {
 
@@ -33,11 +33,11 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] =
     useState<any>(null);
 
-  const [text, setText] =
-    useState("");
-
   const [posts, setPosts] =
     useState<any[]>([]);
+
+  const [text, setText] =
+    useState("");
 
   // ログイン
   useEffect(() => {
@@ -57,8 +57,7 @@ export default function HomePage() {
 
         setUser(u);
 
-        // 自分情報
-        const userSnap =
+        const snap =
           await getDoc(
             doc(
               db,
@@ -67,13 +66,13 @@ export default function HomePage() {
             )
           );
 
-        if (userSnap.exists()) {
+        if (snap.exists()) {
 
           setCurrentUser({
 
             uid: u.uid,
 
-            ...userSnap.data()
+            ...snap.data()
 
           });
 
@@ -189,7 +188,7 @@ export default function HomePage() {
     <div className="flex bg-black min-h-screen text-white">
 
       {/* 左 */}
-      <div className="w-[250px] border-r border-zinc-800 p-4 flex flex-col fixed h-screen">
+      <div className="w-[250px] border-r border-zinc-800 p-4 flex flex-col fixed h-screen bg-black">
 
         {/* ロゴ */}
         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-black text-3xl font-bold mb-8">
@@ -227,7 +226,7 @@ export default function HomePage() {
 
         </div>
 
-        {/* ボタン */}
+        {/* 投稿ボタン */}
         <button
           onClick={createPost}
           className="mt-8 bg-blue-500 hover:bg-blue-600 rounded-full py-4 font-bold text-xl"
@@ -260,13 +259,13 @@ export default function HomePage() {
         <div className="border-b border-zinc-800 p-4">
 
           <textarea
-            placeholder="いまどうしてる？"
             value={text}
             onChange={(e)=>
               setText(
                 e.target.value
               )
             }
+            placeholder="いまどうしてる？"
             className="w-full bg-black text-white outline-none resize-none text-xl min-h-[120px]"
           />
 
