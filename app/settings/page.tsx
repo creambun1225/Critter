@@ -1,74 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import {
-  auth,
-  db
-} from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 
 import {
   signOut,
-  updatePassword
+  deleteUser
 } from "firebase/auth";
 
-import {
-  doc,
-  getDoc,
-  updateDoc
-} from "firebase/firestore";
-
 export default function SettingsPage() {
-
-  const [showAdmin, setShowAdmin] =
-    useState(false);
-
-  const [showAccount, setShowAccount] =
-    useState(false);
-
-  const [password, setPassword] =
-    useState("");
-
-  const [newPassword, setNewPassword] =
-    useState("");
-
-  const [isAdmin, setIsAdmin] =
-    useState(false);
-
-  const [profile, setProfile] =
-    useState<any>(null);
-
-  useEffect(() => {
-
-    const load = async () => {
-
-      if (!auth.currentUser) {
-
-        location.href = "/login";
-
-        return;
-
-      }
-
-      const snap = await getDoc(
-        doc(db, "users", auth.currentUser.uid)
-      );
-
-      if (snap.exists()) {
-
-        setProfile(snap.data());
-
-        setIsAdmin(
-          snap.data().admin || false
-        );
-
-      }
-
-    };
-
-    load();
-
-  }, []);
 
   // ログアウト
   const logout = async () => {
@@ -79,247 +18,70 @@ export default function SettingsPage() {
 
   };
 
-  // 管理者権限
-  const adminAuth = async () => {
-
-    if (password !== "annpannmann") {
-
-      alert("パスワードが違います");
-
-      return;
-
-    }
-
-    if (!auth.currentUser) return;
-
-    await updateDoc(
-      doc(db, "users", auth.currentUser.uid),
-      {
-        admin: true
-      }
-    );
-
-    setIsAdmin(true);
-
-    alert("管理者権限を付与しました");
-
-  };
-
-  // パスワード変更
-  const changePassword =
+  // アカウント削除
+  const removeAccount =
     async () => {
 
-      if (!auth.currentUser)
-        return;
-
-      if (
-        newPassword.length < 6
-      ) {
-
-        alert(
-          "6文字以上にしてください"
+      const ok =
+        confirm(
+          "本当にアカウント削除しますか？"
         );
 
-        return;
-
-      }
+      if (!ok) return;
 
       try {
 
-        await updatePassword(
-          auth.currentUser,
-          newPassword
-        );
+        if (auth.currentUser) {
 
-        alert(
-          "パスワード変更完了"
-        );
-
-        setNewPassword("");
-
-      } catch (e: any) {
-
-        console.log(e);
-
-        if (
-          e.code ===
-          "auth/requires-recent-login"
-        ) {
-
-          alert(
-            "一度ログアウトして再ログインしてください"
+          await deleteUser(
+            auth.currentUser
           );
 
-        } else {
+          alert(
+            "アカウント削除しました"
+          );
 
-          alert(e.message);
+          location.href =
+            "/login";
 
         }
+
+      } catch (e:any) {
+
+        alert(
+          "再ログインしてください"
+        );
 
       }
 
     };
 
   return (
-    <div className="min-h-screen bg-black text-white">
 
-      {/* 上 */}
-      <div className="sticky top-0 z-50 bg-black/80 backdrop-blur border-b border-zinc-800 p-4">
+    <div className="text-white p-6">
 
-        <h1 className="text-2xl font-bold">
-          設定
-        </h1>
+      <h1 className="text-3xl font-bold mb-6">
+        設定
+      </h1>
 
-      </div>
+      {/* ログアウト */}
+      <button
+        onClick={logout}
+        className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4"
+      >
+        ログアウト
+      </button>
 
-      {/* 中 */}
-      <div className="p-4 space-y-4">
-
-        {/* アカウント情報 */}
-        <button
-          onClick={() =>
-            setShowAccount(!showAccount)
-          }
-          className="w-full bg-zinc-900 hover:bg-zinc-800 transition p-4 rounded-2xl text-left"
-        >
-          アカウント情報
-        </button>
-
-        {showAccount && profile && (
-
-          <div className="bg-zinc-900 rounded-2xl p-4 space-y-4">
-
-            {/* username */}
-            <div>
-
-              <p className="text-zinc-500 text-sm">
-                ユーザー名
-              </p>
-
-              <p className="text-lg font-bold">
-                @{profile.username}
-              </p>
-
-            </div>
-
-            {/* email */}
-            <div>
-
-              <p className="text-zinc-500 text-sm">
-                メールアドレス
-              </p>
-
-              <p className="break-all">
-                {profile.email}
-              </p>
-
-            </div>
-
-            {/* password */}
-            <div>
-
-              <p className="text-zinc-500 text-sm mb-2">
-                パスワード変更
-              </p>
-
-              <input
-                type="password"
-                placeholder="新しいパスワード"
-                value={newPassword}
-                onChange={(e) =>
-                  setNewPassword(
-                    e.target.value
-                  )
-                }
-                className="w-full bg-black border border-zinc-700 rounded-xl p-3 outline-none"
-              />
-
-              <button
-                onClick={
-                  changePassword
-                }
-                className="mt-3 bg-blue-500 hover:bg-blue-600 transition px-5 py-2 rounded-full font-bold"
-              >
-                変更
-              </button>
-
-            </div>
-
-            {/* bookmark */}
-            <div>
-
-              <p className="text-zinc-500 text-sm">
-                ブックマーク数
-              </p>
-
-              <p>
-                {profile.bookmarks
-                  ?.length || 0}件
-              </p>
-
-            </div>
-
-          </div>
-
-        )}
-
-        {/* 管理者 */}
-        <button
-          onClick={() =>
-            setShowAdmin(!showAdmin)
-          }
-          className="w-full bg-zinc-900 hover:bg-zinc-800 transition p-4 rounded-2xl text-left"
-        >
-          管理者権限付与
-        </button>
-
-        {showAdmin && (
-
-          <div className="bg-zinc-900 rounded-2xl p-4 space-y-3">
-
-            <input
-              value={password}
-              onChange={(e) =>
-                setPassword(
-                  e.target.value
-                )
-              }
-              placeholder="パスワード"
-              className="w-full bg-black border border-zinc-700 rounded-xl p-3 outline-none"
-            />
-
-            <button
-              onClick={adminAuth}
-              className="bg-blue-500 hover:bg-blue-600 transition px-5 py-2 rounded-full font-bold"
-            >
-              付与
-            </button>
-
-          </div>
-
-        )}
-
-        {/* admin表示 */}
-        {isAdmin && (
-
-          <div className="bg-green-500/20 border border-green-500 rounded-2xl p-4">
-
-            管理者権限があります
-
-          </div>
-
-        )}
-
-        {/* logout */}
-        <button
-          onClick={logout}
-          className="w-full bg-red-500 hover:bg-red-600 transition p-4 rounded-2xl font-bold"
-        >
-          ログアウト
-        </button>
-
-      </div>
+      {/* アカウント削除 */}
+      <button
+        onClick={removeAccount}
+        className="w-full bg-red-600 hover:bg-red-700 rounded-xl p-4 text-left"
+      >
+        アカウント削除
+      </button>
 
     </div>
+
   );
+
 }
