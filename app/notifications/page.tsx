@@ -1,185 +1,253 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
 import {
+  auth,
   db
 } from "@/lib/firebase";
 
 import {
-  doc,
-  deleteDoc,
-  addDoc,
-  collection
+  onAuthStateChanged
+} from "firebase/auth";
+
+import {
+  collection,
+  query,
+  where,
+  onSnapshot
 } from "firebase/firestore";
 
-export default function PostCard({
-  post,
-  currentUser
-}:any) {
+export default function NotificationsPage() {
 
-  const [open, setOpen] =
-    useState(false);
+  const [user, setUser] =
+    useState<any>(null);
 
-  // 通報
-  const reportPost =
-    async () => {
+  const [reports, setReports] =
+    useState<any[]>([]);
 
-      await addDoc(
+  // ログイン
+  useEffect(() => {
+
+    return onAuthStateChanged(
+      auth,
+      (u) => {
+
+        if (!u) {
+
+          location.href =
+            "/login";
+
+          return;
+
+        }
+
+        setUser(u);
+
+      }
+    );
+
+  }, []);
+
+  // 通報取得
+  useEffect(() => {
+
+    if (!user)
+      return;
+
+    const q =
+      query(
         collection(
           db,
           "reports"
-        ),
-        {
-          postId: post.id,
-          text: post.text,
-          createdAt:
-            Date.now()
-        }
-      );
-
-      alert(
-        "通報しました"
-      );
-
-      setOpen(false);
-
-    };
-
-  // 削除
-  const deletePost =
-    async () => {
-
-      await deleteDoc(
-        doc(
-          db,
-          "posts",
-          post.id
         )
       );
 
-    };
+    const unsub =
+      onSnapshot(
+        q,
+        (snap) => {
 
-  const canDelete =
-    currentUser?.uid ===
-      post.uid ||
-    currentUser?.isAdmin;
+          setReports(
+
+            snap.docs.map(
+              (d) => ({
+
+                id: d.id,
+
+                ...d.data()
+
+              })
+            )
+
+          );
+
+        }
+      );
+
+    return () => unsub();
+
+  }, [user]);
+
+  // まだ読み込み中
+  if (!user) {
+
+    return null;
+
+  }
 
   return (
 
-    <div className="border-b border-zinc-800 p-4">
+    <div className="flex bg-black min-h-screen text-white">
 
-      {/* 上 */}
-      <div className="flex justify-between">
+      {/* 左 */}
+      <div className="w-[250px] border-r border-zinc-800 p-4 flex flex-col fixed h-screen bg-black">
 
-        <Link
-          href={`/user/${post.uid}`}
-          className="flex gap-3"
-        >
+        {/* ロゴ */}
+        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-black text-3xl font-bold mb-8">
 
-          {/* アイコン */}
-          <img
-            src={
-              post.icon ||
-              "/default.png"
-            }
-            className="w-12 h-12 rounded-full object-cover"
-          />
+          C
 
-          <div>
+        </div>
 
-            {/* 名前 */}
-            <div className="flex items-center gap-2">
+        {/* メニュー */}
+        <div className="flex flex-col gap-6 text-2xl">
 
-              <div className="font-bold text-white">
+          <Link href="/">
+            🏠 ホーム
+          </Link>
 
-                {post.name}
+          <Link href="/search">
+            🔎 検索
+          </Link>
 
-              </div>
+          <Link href="/notifications">
+            🔔 通知
+          </Link>
 
-              {/* 認証 */}
-              {post.verified && (
+          <Link href={`/user/${user.uid}`}>
+            👤 プロフィール
+          </Link>
 
-                <img
-                  src="/verified.png"
-                  className="w-5 h-5"
-                />
+          <Link href="/bookmarks">
+            🔖 ブックマーク
+          </Link>
 
-              )}
+          <Link href="/settings">
+            ⚙️ 設定
+          </Link>
 
-              {/* 管理者 */}
-              {post.adminVerified && (
+        </div>
 
-                <img
-                  src="/admin.png"
-                  className="w-5 h-5"
-                />
+        {/* バージョン */}
+        <div className="mt-auto text-zinc-500 text-sm">
 
-              )}
-
-            </div>
-
-            {/* username */}
-            <div className="text-zinc-500">
-
-              @{post.username}
-
-            </div>
-
-          </div>
-
-        </Link>
-
-        {/* 詳細 */}
-        <div className="relative">
-
-          <button
-            onClick={()=>
-              setOpen(!open)
-            }
-            className="text-zinc-400 text-xl"
-          >
-            ⋯
-          </button>
-
-          {open && (
-
-            <div className="absolute right-0 top-8 bg-black border border-zinc-700 rounded-xl overflow-hidden w-56 z-50">
-
-              {/* 通報 */}
-              <button
-                onClick={reportPost}
-                className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-400"
-              >
-                このクリートを通報
-              </button>
-
-              {/* 削除 */}
-              {canDelete && (
-
-                <button
-                  onClick={deletePost}
-                  className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-500 border-t border-zinc-800"
-                >
-                  クリートを削除
-                </button>
-
-              )}
-
-            </div>
-
-          )}
+          Critter v1.0.1
 
         </div>
 
       </div>
 
-      {/* 本文 */}
-      <div className="mt-4 whitespace-pre-wrap text-white text-[17px]">
+      {/* 真ん中 */}
+      <div className="ml-[250px] w-[600px] border-r border-zinc-800 min-h-screen">
 
-        {post.text}
+        {/* タイトル */}
+        <div className="sticky top-0 bg-black/80 backdrop-blur border-b border-zinc-800 p-4 z-50">
+
+          <h1 className="text-3xl font-bold">
+
+            通知
+
+          </h1>
+
+        </div>
+
+        {/* 通報一覧 */}
+        <div>
+
+          {reports.length === 0 && (
+
+            <div className="p-6 text-zinc-500">
+
+              通知はありません
+
+            </div>
+
+          )}
+
+          {reports.map((report:any)=>(
+
+            <div
+              key={report.id}
+              className="border-b border-zinc-800 p-4"
+            >
+
+              <div className="text-red-400 font-bold mb-2">
+
+                通報されたクリート
+
+              </div>
+
+              <div className="text-white whitespace-pre-wrap">
+
+                {report.text}
+
+              </div>
+
+            </div>
+
+          ))}
+
+        </div>
+
+      </div>
+
+      {/* 右 */}
+      <div className="flex-1 p-8">
+
+        <div className="bg-zinc-900 rounded-3xl p-6 w-[300px]">
+
+          <div className="text-3xl font-bold mb-6">
+
+            トレンド
+
+          </div>
+
+          <div className="mb-5">
+
+            <div className="text-zinc-500 text-sm">
+
+              トレンド
+
+            </div>
+
+            <div className="font-bold text-xl">
+
+              #AI
+
+            </div>
+
+          </div>
+
+          <div>
+
+            <div className="text-zinc-500 text-sm">
+
+              ゲーム
+
+            </div>
+
+            <div className="font-bold text-xl">
+
+              #Minecraft
+
+            </div>
+
+          </div>
+
+        </div>
 
       </div>
 
