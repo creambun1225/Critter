@@ -13,12 +13,19 @@ import {
 } from "firebase/firestore";
 
 import {
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "firebase/storage";
+
+import {
   onAuthStateChanged
 } from "firebase/auth";
 
 import {
   db,
-  auth
+  auth,
+  storage
 } from "@/lib/firebase";
 
 import Layout from "@/components/Layout";
@@ -28,6 +35,9 @@ export default function Home() {
 
   const [text, setText] =
     useState("");
+
+  const [image, setImage] =
+    useState<any>(null);
 
   const [posts, setPosts] =
     useState<any[]>([]);
@@ -57,7 +67,6 @@ export default function Home() {
 
           setCurrentUser(user);
 
-          // users取得
           const snap =
             await getDoc(
               doc(
@@ -115,31 +124,63 @@ export default function Home() {
   const createPost =
     async () => {
 
-      if (!text.trim()) return;
+      if (
+        !text.trim() &&
+        !image
+      ) return;
+
+      let imageUrl = "";
+
+      // 画像アップロード
+      if (image) {
+
+        const imageRef =
+          ref(
+            storage,
+            `posts/${Date.now()}_${image.name}`
+          );
+
+        await uploadBytes(
+          imageRef,
+          image
+        );
+
+        imageUrl =
+          await getDownloadURL(
+            imageRef
+          );
+
+      }
+
+      // ハッシュタグ抽出
+      const hashtags =
+        text.match(
+          /#\w+/g
+        ) || [];
 
       await addDoc(
         collection(db, "posts"),
         {
           text,
 
+          image:
+            imageUrl,
+
+          hashtags,
+
           uid:
             currentUser.uid,
 
           name:
             userData?.name ||
-            currentUser.displayName ||
             "ユーザー",
 
           username:
             userData?.username ||
-            currentUser.email?.split(
-              "@"
-            )[0] ||
             "user",
 
           icon:
             userData?.icon ||
-            currentUser.photoURL ||
             "",
 
           verified:
@@ -168,6 +209,7 @@ export default function Home() {
       );
 
       setText("");
+      setImage(null);
 
     };
 
@@ -178,7 +220,7 @@ export default function Home() {
       {/* タイトル */}
       <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
 
-        <div className="text-4xl font-bold">
+        <div className="text-3xl md:text-4xl font-bold">
 
           ホーム
 
@@ -189,19 +231,16 @@ export default function Home() {
       {/* 投稿フォーム */}
       <div className="border-b border-zinc-800 p-4 flex gap-4">
 
-        {/* アイコン */}
         <img
           src={
             userData?.icon ||
-            currentUser?.photoURL ||
             "/default.png"
           }
-          className="w-14 h-14 rounded-full object-cover bg-zinc-700 flex-shrink-0"
+          className="w-12 h-12 md:w-14 md:h-14 rounded-full object-cover bg-zinc-700 flex-shrink-0"
         />
 
         <div className="flex-1">
 
-          {/* 入力 */}
           <textarea
             value={text}
             onChange={(e)=>
@@ -210,15 +249,40 @@ export default function Home() {
               )
             }
             placeholder="いまどうしてる？"
-            className="w-full bg-black outline-none resize-none text-xl min-h-[120px]"
+            className="w-full bg-black outline-none resize-none text-lg md:text-xl min-h-[120px]"
           />
 
-          {/* ボタン */}
+          {/* 画像 */}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e)=>
+              setImage(
+                e.target.files?.[0]
+              )
+            }
+            className="mt-4"
+          />
+
+          {/* プレビュー */}
+          {image && (
+
+            <img
+              src={
+                URL.createObjectURL(
+                  image
+                )
+              }
+              className="mt-4 rounded-2xl max-h-[350px] object-cover"
+            />
+
+          )}
+
           <div className="flex justify-end mt-4">
 
             <button
               onClick={createPost}
-              className="bg-blue-500 hover:bg-blue-600 transition px-8 py-3 rounded-full text-lg font-bold"
+              className="bg-blue-500 hover:bg-blue-600 transition px-6 md:px-8 py-3 rounded-full text-lg font-bold"
             >
 
               クリート
@@ -231,7 +295,7 @@ export default function Home() {
 
       </div>
 
-      {/* 投稿一覧 */}
+      {/* 投稿 */}
       <div>
 
         {posts.map((post:any)=>(

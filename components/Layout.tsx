@@ -60,12 +60,12 @@ export default function Layout({
 
   return (
 
-    <div className="bg-black text-white min-h-screen flex justify-center">
+    <div className="bg-black text-white min-h-screen flex justify-center overflow-x-hidden">
 
       <div className="w-full max-w-7xl flex">
 
         {/* 左 */}
-        <div className="w-[275px] h-screen sticky top-0 border-r border-zinc-800 px-4 py-3 flex flex-col">
+        <div className="hidden md:flex w-[275px] h-screen sticky top-0 border-r border-zinc-800 px-4 py-3 flex-col">
 
           {/* ロゴ */}
           <Link
@@ -119,7 +119,7 @@ export default function Layout({
 
           </div>
 
-          {/* クリート */}
+          {/* ボタン */}
           <button className="mt-6 bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-xl font-bold">
 
             クリート
@@ -170,18 +170,18 @@ export default function Layout({
         </div>
 
         {/* 真ん中 */}
-        <main className="flex-1 border-r border-l border-zinc-800 min-h-screen max-w-[700px]">
+        <main className="flex-1 border-r border-l border-zinc-800 min-h-screen max-w-[700px] w-full">
 
           {children}
 
         </main>
 
         {/* 右 */}
-        <div className="w-[350px] p-4 hidden xl:block">
+        <div className="hidden xl:block w-[350px] p-4">
 
-          {/* 検索 */}
           <div className="sticky top-4">
 
+            {/* 検索 */}
             <input
               placeholder="検索"
               className="w-full bg-zinc-900 rounded-full px-5 py-4 outline-none text-lg mb-4"
@@ -256,6 +256,31 @@ export default function Layout({
           </div>
 
         </div>
+
+      </div>
+
+      {/* モバイル下メニュー */}
+      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around py-3 md:hidden z-50">
+
+        <Link href="/">
+          🏠
+        </Link>
+
+        <Link href="/search">
+          🔎
+        </Link>
+
+        <Link href="/notifications">
+          🔔
+        </Link>
+
+        <Link href="/bookmarks">
+          🔖
+        </Link>
+
+        <Link href={`/user/${currentUser?.uid}`}>
+          👤
+        </Link>
 
       </div>
 

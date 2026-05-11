@@ -5,16 +5,23 @@ import { useState } from "react";
 import Link from "next/link";
 
 import {
+  formatDistanceToNow
+} from "date-fns";
+
+import {
+  ja
+} from "date-fns/locale";
+
+import {
   db
 } from "@/lib/firebase";
 
 import {
   doc,
   deleteDoc,
-  addDoc,
-  collection,
   updateDoc,
-  increment
+  arrayUnion,
+  arrayRemove
 } from "firebase/firestore";
 
 export default function PostCard({
@@ -25,81 +32,49 @@ export default function PostCard({
   const [open, setOpen] =
     useState(false);
 
-  const [liked, setLiked] =
-    useState(false);
-
-  const [reposted, setReposted] =
-    useState(false);
-
-  const [bookmarked, setBookmarked] =
-    useState(false);
-
-  // 通報
-  const reportPost =
+  // フォロー
+  const follow =
     async () => {
 
-      await addDoc(
-        collection(
+      await updateDoc(
+        doc(
           db,
-          "reports"
+          "users",
+          post.uid
         ),
         {
-          postId:
-            post.id,
-
-          postText:
-            post.text,
-
-          reportedBy:
-            currentUser?.uid,
-
-          postUserId:
-            post.uid,
-
-          createdAt:
-            Date.now()
+          followers:
+            arrayUnion(
+              currentUser.uid
+            )
         }
       );
 
-      // 管理者通知
-      await addDoc(
-        collection(
+    };
+
+  // フォロー解除
+  const unfollow =
+    async () => {
+
+      await updateDoc(
+        doc(
           db,
-          "notifications"
+          "users",
+          post.uid
         ),
         {
-          type:
-            "report",
-
-          text:
-            "クリートが通報されました",
-
-          postId:
-            post.id,
-
-          createdAt:
-            Date.now()
+          followers:
+            arrayRemove(
+              currentUser.uid
+            )
         }
       );
-
-      alert(
-        "通報しました"
-      );
-
-      setOpen(false);
 
     };
 
   // 削除
   const deletePost =
     async () => {
-
-      const ok =
-        confirm(
-          "このクリートを削除しますか？"
-        );
-
-      if (!ok) return;
 
       await deleteDoc(
         doc(
@@ -111,91 +86,26 @@ export default function PostCard({
 
     };
 
-  // いいね
-  const likePost =
-    async () => {
+  const isFollowing =
 
-      if (liked) return;
-
-      setLiked(true);
-
-      await updateDoc(
-        doc(
-          db,
-          "posts",
-          post.id
-        ),
-        {
-          likes:
-            increment(1)
-        }
-      );
-
-    };
-
-  // リポスト
-  const repostPost =
-    async () => {
-
-      if (reposted) return;
-
-      setReposted(true);
-
-      await updateDoc(
-        doc(
-          db,
-          "posts",
-          post.id
-        ),
-        {
-          reposts:
-            increment(1)
-        }
-      );
-
-    };
-
-  // ブックマーク
-  const bookmarkPost =
-    async () => {
-
-      if (bookmarked) return;
-
-      setBookmarked(true);
-
-      await updateDoc(
-        doc(
-          db,
-          "posts",
-          post.id
-        ),
-        {
-          bookmarks:
-            increment(1)
-        }
-      );
-
-    };
+    post.followers?.includes(
+      currentUser?.uid
+    );
 
   const canDelete =
 
     currentUser?.uid ===
       post.uid ||
 
-    currentUser?.admin ===
-      true ||
-
-    currentUser?.isAdmin ===
-      true;
+    currentUser?.admin;
 
   return (
 
     <div className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">
 
       {/* 上 */}
-      <div className="flex justify-between items-start gap-3">
+      <div className="flex justify-between gap-3">
 
-        {/* 左 */}
         <Link
           href={`/user/${post.uid}`}
           className="flex gap-3 flex-1 min-w-0"
@@ -207,22 +117,21 @@ export default function PostCard({
               post.icon ||
               "/default.png"
             }
-            className="w-12 h-12 rounded-full object-cover flex-shrink-0 bg-zinc-700"
+            className="w-12 h-12 rounded-full object-cover bg-zinc-700 flex-shrink-0"
           />
 
-          {/* 情報 */}
           <div className="min-w-0 flex-1">
 
             {/* 名前 */}
             <div className="flex items-center gap-2 flex-wrap">
 
-              <div className="font-bold text-[17px] truncate">
+              <div className="font-bold truncate">
 
                 {post.name}
 
               </div>
 
-              {/* 青認証 */}
+              {/* 青 */}
               {post.verified && (
 
                 <img
@@ -232,7 +141,7 @@ export default function PostCard({
 
               )}
 
-              {/* 金認証 */}
+              {/* 金 */}
               {post.adminVerified && (
 
                 <img
@@ -248,12 +157,81 @@ export default function PostCard({
 
               </div>
 
+              {/* 時間 */}
+              <div className="text-zinc-500 text-sm">
+
+                · {
+
+                  formatDistanceToNow(
+                    new Date(
+                      post.createdAt
+                    ),
+                    {
+                      addSuffix: true,
+                      locale: ja
+                    }
+                  )
+
+                }
+
+              </div>
+
             </div>
 
             {/* 本文 */}
-            <div className="mt-2 whitespace-pre-wrap break-words text-[16px]">
+            <div className="mt-2 whitespace-pre-wrap break-words">
 
               {post.text}
+
+            </div>
+
+            {/* 画像 */}
+            {post.image && (
+
+              <img
+                src={post.image}
+                className="mt-4 rounded-2xl w-full max-h-[500px] object-cover border border-zinc-800"
+              />
+
+            )}
+
+            {/* ハッシュタグ */}
+            <div className="flex gap-2 flex-wrap mt-3">
+
+              {(post.hashtags || [])
+                .map((tag:string)=>(
+
+                <div
+                  key={tag}
+                  className="text-sky-400"
+                >
+
+                  {tag}
+
+                </div>
+
+              ))}
+
+            </div>
+
+            {/* ボタン */}
+            <div className="flex justify-between mt-5 max-w-md text-zinc-500">
+
+              <button>
+                💬 {post.replies || 0}
+              </button>
+
+              <button>
+                🔁 {post.reposts || 0}
+              </button>
+
+              <button>
+                ❤️ {post.likes || 0}
+              </button>
+
+              <button>
+                🔖 {post.bookmarks || 0}
+              </button>
 
             </div>
 
@@ -261,119 +239,67 @@ export default function PostCard({
 
         </Link>
 
-        {/* 詳細 */}
-        <div className="relative flex-shrink-0">
+        {/* 右 */}
+        <div className="flex flex-col items-end gap-2">
 
-          <button
-            onClick={() =>
-              setOpen(!open)
-            }
-            className="text-zinc-500 hover:text-white text-2xl px-2"
-          >
+          {/* 詳細 */}
+          <div className="relative">
 
-            ⋯
+            <button
+              onClick={()=>
+                setOpen(!open)
+              }
+              className="text-2xl text-zinc-500 hover:text-white"
+            >
+              ⋯
+            </button>
 
-          </button>
+            {open && (
 
-          {open && (
+              <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-56 z-50">
 
-            <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-64 z-50 shadow-2xl">
+                {/* フォロー */}
+                {currentUser?.uid !==
+                  post.uid && (
 
-              {/* 通報 */}
-              <button
-                onClick={reportPost}
-                className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-400"
-              >
+                  <button
+                    onClick={
+                      isFollowing
+                        ? unfollow
+                        : follow
+                    }
+                    className="w-full text-left px-4 py-3 hover:bg-zinc-900"
+                  >
 
-                このクリートを通報
+                    {isFollowing
+                      ? "フォロー解除"
+                      : "フォロー"}
 
-              </button>
+                  </button>
 
-              {/* 削除 */}
-              {canDelete && (
+                )}
 
-                <button
-                  onClick={deletePost}
-                  className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-500 border-t border-zinc-800"
-                >
+                {/* 削除 */}
+                {canDelete && (
 
-                  クリートを削除
+                  <button
+                    onClick={deletePost}
+                    className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-500 border-t border-zinc-800"
+                  >
 
-                </button>
+                    クリートを削除
 
-              )}
+                  </button>
 
-            </div>
+                )}
 
-          )}
+              </div>
+
+            )}
+
+          </div>
 
         </div>
-
-      </div>
-
-      {/* 下 */}
-      <div className="flex justify-between mt-5 max-w-md text-zinc-500 ml-[60px]">
-
-        {/* 返信 */}
-        <button className="hover:text-sky-400 flex items-center gap-2 transition">
-
-          <span>
-            💬
-          </span>
-
-          <span>
-            {post.replies || 0}
-          </span>
-
-        </button>
-
-        {/* リポスト */}
-        <button
-          onClick={repostPost}
-          className="hover:text-green-400 flex items-center gap-2 transition"
-        >
-
-          <span>
-            🔁
-          </span>
-
-          <span>
-            {post.reposts || 0}
-          </span>
-
-        </button>
-
-        {/* いいね */}
-        <button
-          onClick={likePost}
-          className="hover:text-pink-400 flex items-center gap-2 transition"
-        >
-
-          <span>
-            ❤️
-          </span>
-
-          <span>
-            {post.likes || 0}
-          </span>
-
-        </button>
-
-        {/* ブックマーク */}
-        <button
-          onClick={bookmarkPost}
-          className="hover:text-yellow-400 flex items-center gap-2 transition"
-        >
-
-          <span>
-            🔖
-          </span>
-
-          <span>
-            {post.bookmarks || 0}
-          </span>
-
-        </button>
 
       </div>
 
