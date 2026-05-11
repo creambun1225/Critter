@@ -67,7 +67,7 @@ export default function Layout({
           {/* バージョン */}
           <div className="text-gray-500 text-sm mt-4">
 
-            Critter v1.0.1
+            Critter v1.0.2
 
           </div>
 
