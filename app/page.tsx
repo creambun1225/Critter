@@ -4,121 +4,86 @@ import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
-import PostCard from "@/components/PostCard";
-
 import {
-  auth,
-  db
-} from "@/lib/firebase";
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot
+} from "firebase/firestore";
 
 import {
   onAuthStateChanged
 } from "firebase/auth";
 
 import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  addDoc,
-  doc,
-  getDoc
-} from "firebase/firestore";
+  db,
+  auth
+} from "@/lib/firebase";
 
-export default function HomePage() {
+import PostCard from "@/components/PostCard";
 
-  const [user, setUser] =
-    useState<any>(null);
-
-  const [currentUser, setCurrentUser] =
-    useState<any>(null);
-
-  const [posts, setPosts] =
-    useState<any[]>([]);
+export default function Home() {
 
   const [text, setText] =
     useState("");
 
-  // ログイン
+  const [posts, setPosts] =
+    useState<any[]>([]);
+
+  const [currentUser, setCurrentUser] =
+    useState<any>(null);
+
+  // ログイン確認
   useEffect(() => {
 
-    return onAuthStateChanged(
-      auth,
-      async (u) => {
+    const unsub =
+      onAuthStateChanged(
+        auth,
+        async (user) => {
 
-        if (!u) {
+          if (!user) {
 
-          location.href =
-            "/login";
+            location.href =
+              "/login";
 
-          return;
+            return;
 
-        }
+          }
 
-        setUser(u);
-
-        const snap =
-          await getDoc(
-            doc(
-              db,
-              "users",
-              u.uid
-            )
-          );
-
-        if (snap.exists()) {
-
-          setCurrentUser({
-
-            uid: u.uid,
-
-            ...snap.data()
-
-          });
+          setCurrentUser(user);
 
         }
+      );
 
-      }
-    );
+    return () => unsub();
 
   }, []);
 
   // 投稿取得
   useEffect(() => {
 
-    const q =
-      query(
-        collection(
-          db,
-          "posts"
-        ),
-        orderBy(
-          "createdAt",
-          "desc"
-        )
-      );
+    const q = query(
+      collection(db, "posts"),
+      orderBy(
+        "createdAt",
+        "desc"
+      )
+    );
 
     const unsub =
-      onSnapshot(
-        q,
-        (snap) => {
+      onSnapshot(q, (snap) => {
 
-          setPosts(
+        setPosts(
+          snap.docs.map(
+            (doc:any) => ({
+              id: doc.id,
+              ...doc.data()
+            })
+          )
+        );
 
-            snap.docs.map(
-              (d) => ({
-
-                id: d.id,
-
-                ...d.data()
-
-              })
-            )
-
-          );
-
-        }
-      );
+      });
 
     return () => unsub();
 
@@ -128,46 +93,37 @@ export default function HomePage() {
   const createPost =
     async () => {
 
-      if (!text.trim())
-        return;
-
-      if (!currentUser)
-        return;
+      if (!text.trim()) return;
 
       await addDoc(
-        collection(
-          db,
-          "posts"
-        ),
+        collection(db, "posts"),
         {
+          text,
+
           uid:
-            user.uid,
+            currentUser.uid,
 
           name:
-            currentUser.name ||
+            currentUser.displayName ||
             "ユーザー",
 
           username:
-            currentUser.username ||
-            "user",
+            currentUser.email?.split(
+              "@"
+            )[0] || "user",
 
           icon:
-            currentUser.icon ||
-            "",
+            currentUser.photoURL || "",
 
-          verified:
-            currentUser.verified ||
-            false,
+          verified: false,
 
-          adminVerified:
-            currentUser.adminVerified ||
-            false,
+          adminVerified: false,
 
-          text,
-
-          likes: 0,
+          replies: 0,
 
           reposts: 0,
+
+          likes: 0,
 
           bookmarks: 0,
 
@@ -180,15 +136,12 @@ export default function HomePage() {
 
     };
 
-  if (!user)
-    return null;
-
   return (
 
-    <div className="flex bg-black min-h-screen text-white">
+    <div className="flex justify-center bg-black min-h-screen text-white">
 
       {/* 左 */}
-      <div className="w-[250px] border-r border-zinc-800 p-4 flex flex-col fixed h-screen bg-black">
+      <div className="w-[260px] border-r border-zinc-800 p-4 flex flex-col fixed left-0 top-0 h-screen bg-black">
 
         {/* ロゴ */}
         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-black text-3xl font-bold mb-8">
@@ -198,7 +151,7 @@ export default function HomePage() {
         </div>
 
         {/* メニュー */}
-        <div className="flex flex-col gap-6 text-2xl">
+        <div className="flex flex-col gap-6 text-2xl font-bold">
 
           <Link href="/">
             🏠 ホーム
@@ -212,7 +165,9 @@ export default function HomePage() {
             🔔 通知
           </Link>
 
-          <Link href={`/user/${user.uid}`}>
+          <Link
+            href={`/user/${currentUser?.uid}`}
+          >
             👤 プロフィール
           </Link>
 
@@ -226,16 +181,18 @@ export default function HomePage() {
 
         </div>
 
-        {/* 投稿ボタン */}
+        {/* クリート */}
         <button
           onClick={createPost}
-          className="mt-8 bg-blue-500 hover:bg-blue-600 rounded-full py-4 font-bold text-xl"
+          className="mt-10 bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-2xl font-bold"
         >
+
           クリート
+
         </button>
 
         {/* バージョン */}
-        <div className="mt-auto text-zinc-500 text-sm">
+        <div className="mt-auto text-zinc-500">
 
           Critter v1.0.1
 
@@ -243,19 +200,21 @@ export default function HomePage() {
 
       </div>
 
-      {/* 真ん中 */}
-      <div className="ml-[250px] w-[600px] border-r border-zinc-800 min-h-screen">
+      {/* 中央 */}
+      <div className="w-[620px] border-r border-l border-zinc-800 min-h-screen ml-[260px]">
 
-        {/* 上 */}
-        <div className="sticky top-0 bg-black/80 backdrop-blur border-b border-zinc-800 p-4 z-50">
+        {/* タイトル */}
+        <div className="sticky top-0 z-50 bg-black/80 backdrop-blur border-b border-zinc-800 p-4">
 
-          <h1 className="text-3xl font-bold">
+          <div className="text-5xl font-bold">
+
             ホーム
-          </h1>
+
+          </div>
 
         </div>
 
-        {/* 投稿欄 */}
+        {/* 投稿フォーム */}
         <div className="border-b border-zinc-800 p-4">
 
           <textarea
@@ -266,16 +225,18 @@ export default function HomePage() {
               )
             }
             placeholder="いまどうしてる？"
-            className="w-full bg-black text-white outline-none resize-none text-xl min-h-[120px]"
+            className="w-full bg-black outline-none resize-none text-2xl min-h-[120px]"
           />
 
           <div className="flex justify-end mt-4">
 
             <button
               onClick={createPost}
-              className="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-full font-bold"
+              className="bg-blue-500 hover:bg-blue-600 transition px-8 py-3 rounded-full text-xl font-bold"
             >
+
               クリート
+
             </button>
 
           </div>
@@ -283,24 +244,28 @@ export default function HomePage() {
         </div>
 
         {/* 投稿一覧 */}
-        {posts.map((post:any)=>(
+        <div>
 
-          <PostCard
-            key={post.id}
-            post={post}
-            currentUser={currentUser}
-          />
+          {posts.map((post:any)=>(
 
-        ))}
+            <PostCard
+              key={post.id}
+              post={post}
+              currentUser={currentUser}
+            />
+
+          ))}
+
+        </div>
 
       </div>
 
       {/* 右 */}
-      <div className="flex-1 p-8">
+      <div className="w-[350px] p-6">
 
-        <div className="bg-zinc-900 rounded-3xl p-6 w-[300px]">
+        <div className="bg-zinc-900 rounded-3xl p-6 sticky top-6">
 
-          <div className="text-3xl font-bold mb-6">
+          <div className="text-4xl font-bold mb-6">
 
             トレンド
 
@@ -308,13 +273,13 @@ export default function HomePage() {
 
           <div className="mb-5">
 
-            <div className="text-zinc-500 text-sm">
+            <div className="text-zinc-500">
 
               トレンド
 
             </div>
 
-            <div className="font-bold text-xl">
+            <div className="font-bold text-3xl">
 
               #AI
 
@@ -324,13 +289,13 @@ export default function HomePage() {
 
           <div>
 
-            <div className="text-zinc-500 text-sm">
+            <div className="text-zinc-500">
 
               ゲーム
 
             </div>
 
-            <div className="font-bold text-xl">
+            <div className="font-bold text-3xl">
 
               #Minecraft
 
