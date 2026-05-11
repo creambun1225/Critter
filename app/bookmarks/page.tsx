@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import Link from "next/link";
+import Layout from "@/components/Layout";
+import PostCard from "@/components/PostCard";
 
 import {
   auth,
@@ -14,109 +15,124 @@ import {
 } from "firebase/auth";
 
 import {
-  doc,
-  getDoc
+  collection,
+  onSnapshot,
+  query,
+  where
 } from "firebase/firestore";
 
 export default function BookmarksPage() {
 
-  const [posts, setPosts] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] =
+    useState<any>(null);
 
+  const [posts, setPosts] =
+    useState<any[]>([]);
+
+  // ログイン確認
   useEffect(() => {
 
-    return onAuthStateChanged(auth, async (user) => {
+    return onAuthStateChanged(
+      auth,
+      (user) => {
 
-      if (!user) return;
+        if (!user) {
 
-      const userSnap = await getDoc(
-        doc(db, "users", user.uid)
-      );
+          location.href =
+            "/login";
 
-      const data: any = userSnap.data();
-
-      const ids = data.bookmarks || [];
-
-      const loaded = [];
-
-      for (const id of ids) {
-
-        const snap = await getDoc(
-          doc(db, "posts", id)
-        );
-
-        if (snap.exists()) {
-
-          loaded.push({
-            id: snap.id,
-            ...snap.data()
-          });
+          return;
 
         }
 
+        setCurrentUser(user);
+
       }
-
-      setPosts(loaded);
-
-    });
+    );
 
   }, []);
 
+  // ブックマーク取得
+  useEffect(() => {
+
+    if (!currentUser) return;
+
+    const q =
+      query(
+        collection(
+          db,
+          "posts"
+        ),
+        where(
+          "bookmarkedBy",
+          "array-contains",
+          currentUser.uid
+        )
+      );
+
+    const unsub =
+      onSnapshot(
+        q,
+        (snap) => {
+
+          setPosts(
+
+            snap.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+
+          );
+
+        }
+      );
+
+    return () => unsub();
+
+  }, [currentUser]);
+
   return (
-    <div className="min-h-screen bg-black text-white">
 
-      <div className="sticky top-0 z-50 bg-black/80 backdrop-blur border-b border-zinc-800 p-4">
+    <Layout currentUser={currentUser}>
 
-        <h1 className="text-2xl font-bold">
+      {/* タイトル */}
+      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
+
+        <div className="text-4xl font-bold">
+
           ブックマーク
-        </h1>
+
+        </div>
 
       </div>
 
-      {posts.length === 0 && (
+      {/* 投稿 */}
+      <div>
 
-        <div className="p-10 text-center text-zinc-500">
+        {posts.length === 0 && (
 
-          ブックマークがありません
+          <div className="p-8 text-zinc-500 text-center">
 
-        </div>
+            ブックマークはまだありません
 
-      )}
+          </div>
 
-      {posts.map((p) => (
+        )}
 
-        <div
-          key={p.id}
-          className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition"
-        >
+        {posts.map((post:any) => (
 
-          <Link href={`/user/${p.uid}`}>
+          <PostCard
+            key={post.id}
+            post={post}
+            currentUser={currentUser}
+          />
 
-            <div className="flex items-center gap-2 hover:underline cursor-pointer">
+        ))}
 
-              <p className="font-bold">
-                {p.name}
-              </p>
+      </div>
 
-              <p className="text-zinc-500">
-                @{p.username}
-              </p>
+    </Layout>
 
-            </div>
-
-          </Link>
-
-          <Link href={`/post/${p.id}`}>
-
-            <p className="mt-2 whitespace-pre-wrap hover:underline">
-              {p.text}
-            </p>
-
-          </Link>
-
-        </div>
-
-      ))}
-
-    </div>
   );
+
 }
