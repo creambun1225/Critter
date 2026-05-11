@@ -2,44 +2,83 @@
 
 import { useEffect, useState } from "react";
 
-import Link from "next/link";
+import Layout from "@/components/Layout";
 
 import {
-  auth
+  auth,
+  db
 } from "@/lib/firebase";
 
 import {
   onAuthStateChanged
 } from "firebase/auth";
 
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot
+} from "firebase/firestore";
+
 export default function NotificationsPage() {
 
-  const [user, setUser] =
+  const [currentUser, setCurrentUser] =
     useState<any>(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [notifications, setNotifications] =
+    useState<any[]>([]);
 
   // ログイン確認
   useEffect(() => {
 
+    return onAuthStateChanged(
+      auth,
+      (user) => {
+
+        if (!user) {
+
+          location.href =
+            "/login";
+
+          return;
+
+        }
+
+        setCurrentUser(user);
+
+      }
+    );
+
+  }, []);
+
+  // 通知取得
+  useEffect(() => {
+
+    const q =
+      query(
+        collection(
+          db,
+          "notifications"
+        ),
+        orderBy(
+          "createdAt",
+          "desc"
+        )
+      );
+
     const unsub =
-      onAuthStateChanged(
-        auth,
-        (u) => {
+      onSnapshot(
+        q,
+        (snap) => {
 
-          if (!u) {
+          setNotifications(
 
-            location.href =
-              "/login";
+            snap.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data()
+            }))
 
-            return;
-
-          }
-
-          setUser(u);
-
-          setLoading(false);
+          );
 
         }
       );
@@ -48,138 +87,129 @@ export default function NotificationsPage() {
 
   }, []);
 
-  // 読み込み中
-  if (loading) {
-
-    return null;
-
-  }
-
-  // user無い
-  if (!user) {
-
-    return null;
-
-  }
-
   return (
 
-    <div className="flex bg-black min-h-screen text-white">
+    <Layout currentUser={currentUser}>
 
-      {/* 左 */}
-      <div className="w-[250px] border-r border-zinc-800 p-4 flex flex-col fixed h-screen bg-black">
+      {/* タイトル */}
+      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
 
-        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-black text-3xl font-bold mb-8">
+        <div className="text-4xl font-bold">
 
-          C
-
-        </div>
-
-        <div className="flex flex-col gap-6 text-2xl">
-
-          <Link href="/">
-            🏠 ホーム
-          </Link>
-
-          <Link href="/search">
-            🔎 検索
-          </Link>
-
-          <Link href="/notifications">
-            🔔 通知
-          </Link>
-
-          <Link href={`/user/${user.uid}`}>
-            👤 プロフィール
-          </Link>
-
-          <Link href="/bookmarks">
-            🔖 ブックマーク
-          </Link>
-
-          <Link href="/settings">
-            ⚙️ 設定
-          </Link>
-
-        </div>
-
-        <div className="mt-auto text-zinc-500 text-sm">
-
-          Critter v1.0.1
+          通知
 
         </div>
 
       </div>
 
-      {/* 真ん中 */}
-      <div className="ml-[250px] w-[600px] min-h-screen border-r border-zinc-800">
+      {/* 通知一覧 */}
+      <div>
 
-        <div className="sticky top-0 bg-black/80 backdrop-blur border-b border-zinc-800 p-4 z-50">
+        {notifications.length === 0 && (
 
-          <h1 className="text-3xl font-bold">
+          <div className="p-8 text-zinc-500 text-center">
 
-            通知
+            通知はまだありません
 
-          </h1>
+          </div>
 
-        </div>
+        )}
 
-        <div className="p-6 text-zinc-400">
+        {notifications.map((n:any) => (
 
-          通知はまだありません
+          <div
+            key={n.id}
+            className="border-b border-zinc-800 p-5 hover:bg-zinc-950 transition"
+          >
 
-        </div>
+            {/* 通報 */}
+            {n.type === "report" && (
+
+              <div>
+
+                <div className="text-red-400 font-bold text-lg">
+
+                  🚨 通報
+
+                </div>
+
+                <div className="mt-2 text-white">
+
+                  {n.text}
+
+                </div>
+
+              </div>
+
+            )}
+
+            {/* いいね */}
+            {n.type === "like" && (
+
+              <div>
+
+                <div className="text-pink-400 font-bold text-lg">
+
+                  ❤️ いいね
+
+                </div>
+
+                <div className="mt-2">
+
+                  あなたのクリートがいいねされました
+                </div>
+
+              </div>
+
+            )}
+
+            {/* リポスト */}
+            {n.type === "repost" && (
+
+              <div>
+
+                <div className="text-green-400 font-bold text-lg">
+
+                  🔁 リポスト
+
+                </div>
+
+                <div className="mt-2">
+
+                  あなたのクリートがリポストされました
+                </div>
+
+              </div>
+
+            )}
+
+            {/* フォロー */}
+            {n.type === "follow" && (
+
+              <div>
+
+                <div className="text-sky-400 font-bold text-lg">
+
+                  👤 フォロー
+
+                </div>
+
+                <div className="mt-2">
+
+                  新しいフォロワーがいます
+                </div>
+
+              </div>
+
+            )}
+
+          </div>
+
+        ))}
 
       </div>
 
-      {/* 右 */}
-      <div className="flex-1 p-8">
-
-        <div className="bg-zinc-900 rounded-3xl p-6 w-[300px]">
-
-          <div className="text-3xl font-bold mb-6">
-
-            トレンド
-
-          </div>
-
-          <div className="mb-5">
-
-            <div className="text-zinc-500 text-sm">
-
-              トレンド
-
-            </div>
-
-            <div className="font-bold text-xl">
-
-              #AI
-
-            </div>
-
-          </div>
-
-          <div>
-
-            <div className="text-zinc-500 text-sm">
-
-              ゲーム
-
-            </div>
-
-            <div className="font-bold text-xl">
-
-              #Minecraft
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
+    </Layout>
 
   );
 

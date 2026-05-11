@@ -13,7 +13,8 @@ import {
   deleteDoc,
   addDoc,
   collection,
-  updateDoc
+  updateDoc,
+  increment
 } from "firebase/firestore";
 
 export default function PostCard({
@@ -22,6 +23,15 @@ export default function PostCard({
 }: any) {
 
   const [open, setOpen] =
+    useState(false);
+
+  const [liked, setLiked] =
+    useState(false);
+
+  const [reposted, setReposted] =
+    useState(false);
+
+  const [bookmarked, setBookmarked] =
     useState(false);
 
   // 通報
@@ -34,8 +44,39 @@ export default function PostCard({
           "reports"
         ),
         {
-          postId: post.id,
-          text: post.text,
+          postId:
+            post.id,
+
+          postText:
+            post.text,
+
+          reportedBy:
+            currentUser?.uid,
+
+          postUserId:
+            post.uid,
+
+          createdAt:
+            Date.now()
+        }
+      );
+
+      // 管理者通知
+      await addDoc(
+        collection(
+          db,
+          "notifications"
+        ),
+        {
+          type:
+            "report",
+
+          text:
+            "クリートが通報されました",
+
+          postId:
+            post.id,
+
           createdAt:
             Date.now()
         }
@@ -53,6 +94,13 @@ export default function PostCard({
   const deletePost =
     async () => {
 
+      const ok =
+        confirm(
+          "このクリートを削除しますか？"
+        );
+
+      if (!ok) return;
+
       await deleteDoc(
         doc(
           db,
@@ -67,6 +115,10 @@ export default function PostCard({
   const likePost =
     async () => {
 
+      if (liked) return;
+
+      setLiked(true);
+
       await updateDoc(
         doc(
           db,
@@ -75,7 +127,7 @@ export default function PostCard({
         ),
         {
           likes:
-            (post.likes || 0) + 1
+            increment(1)
         }
       );
 
@@ -85,6 +137,10 @@ export default function PostCard({
   const repostPost =
     async () => {
 
+      if (reposted) return;
+
+      setReposted(true);
+
       await updateDoc(
         doc(
           db,
@@ -93,7 +149,7 @@ export default function PostCard({
         ),
         {
           reposts:
-            (post.reposts || 0) + 1
+            increment(1)
         }
       );
 
@@ -103,6 +159,10 @@ export default function PostCard({
   const bookmarkPost =
     async () => {
 
+      if (bookmarked) return;
+
+      setBookmarked(true);
+
       await updateDoc(
         doc(
           db,
@@ -111,27 +171,34 @@ export default function PostCard({
         ),
         {
           bookmarks:
-            (post.bookmarks || 0) + 1
+            increment(1)
         }
       );
 
     };
 
   const canDelete =
+
     currentUser?.uid ===
       post.uid ||
-    currentUser?.isAdmin;
+
+    currentUser?.admin ===
+      true ||
+
+    currentUser?.isAdmin ===
+      true;
 
   return (
 
-    <div className="border-b border-zinc-800 p-4">
+    <div className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">
 
       {/* 上 */}
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-start gap-3">
 
+        {/* 左 */}
         <Link
           href={`/user/${post.uid}`}
-          className="flex gap-3"
+          className="flex gap-3 flex-1 min-w-0"
         >
 
           {/* アイコン */}
@@ -140,15 +207,16 @@ export default function PostCard({
               post.icon ||
               "/default.png"
             }
-            className="w-12 h-12 rounded-full object-cover shrink-0"
+            className="w-12 h-12 rounded-full object-cover flex-shrink-0 bg-zinc-700"
           />
 
-          <div>
+          {/* 情報 */}
+          <div className="min-w-0 flex-1">
 
             {/* 名前 */}
             <div className="flex items-center gap-2 flex-wrap">
 
-              <div className="font-bold text-white text-xl">
+              <div className="font-bold text-[17px] truncate">
 
                 {post.name}
 
@@ -158,7 +226,7 @@ export default function PostCard({
               {post.verified && (
 
                 <img
-                  src="/verified.png"
+                  src="/verified-blue.png"
                   className="w-5 h-5"
                 />
 
@@ -168,18 +236,24 @@ export default function PostCard({
               {post.adminVerified && (
 
                 <img
-                  src="/admin.png"
+                  src="/verified-gold.png"
                   className="w-5 h-5"
                 />
 
               )}
 
+              <div className="text-zinc-500 truncate">
+
+                @{post.username}
+
+              </div>
+
             </div>
 
-            {/* username */}
-            <div className="text-zinc-500">
+            {/* 本文 */}
+            <div className="mt-2 whitespace-pre-wrap break-words text-[16px]">
 
-              @{post.username}
+              {post.text}
 
             </div>
 
@@ -188,27 +262,31 @@ export default function PostCard({
         </Link>
 
         {/* 詳細 */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
 
           <button
-            onClick={()=>
+            onClick={() =>
               setOpen(!open)
             }
-            className="text-zinc-400 text-2xl hover:text-white"
+            className="text-zinc-500 hover:text-white text-2xl px-2"
           >
+
             ⋯
+
           </button>
 
           {open && (
 
-            <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-56 z-50 shadow-xl">
+            <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-64 z-50 shadow-2xl">
 
               {/* 通報 */}
               <button
                 onClick={reportPost}
                 className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-400"
               >
+
                 このクリートを通報
+
               </button>
 
               {/* 削除 */}
@@ -218,7 +296,9 @@ export default function PostCard({
                   onClick={deletePost}
                   className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-500 border-t border-zinc-800"
                 >
+
                   クリートを削除
+
                 </button>
 
               )}
@@ -231,20 +311,15 @@ export default function PostCard({
 
       </div>
 
-      {/* 本文 */}
-      <div className="mt-4 whitespace-pre-wrap text-white text-[17px]">
-
-        {post.text}
-
-      </div>
-
-      {/* 下ボタン */}
-      <div className="flex justify-between mt-5 text-zinc-500 max-w-md">
+      {/* 下 */}
+      <div className="flex justify-between mt-5 max-w-md text-zinc-500 ml-[60px]">
 
         {/* 返信 */}
-        <button className="hover:text-sky-400 flex items-center gap-2">
+        <button className="hover:text-sky-400 flex items-center gap-2 transition">
 
-          💬
+          <span>
+            💬
+          </span>
 
           <span>
             {post.replies || 0}
@@ -255,10 +330,12 @@ export default function PostCard({
         {/* リポスト */}
         <button
           onClick={repostPost}
-          className="hover:text-green-400 flex items-center gap-2"
+          className="hover:text-green-400 flex items-center gap-2 transition"
         >
 
-          🔁
+          <span>
+            🔁
+          </span>
 
           <span>
             {post.reposts || 0}
@@ -269,10 +346,12 @@ export default function PostCard({
         {/* いいね */}
         <button
           onClick={likePost}
-          className="hover:text-pink-400 flex items-center gap-2"
+          className="hover:text-pink-400 flex items-center gap-2 transition"
         >
 
-          ❤️
+          <span>
+            ❤️
+          </span>
 
           <span>
             {post.likes || 0}
@@ -283,10 +362,12 @@ export default function PostCard({
         {/* ブックマーク */}
         <button
           onClick={bookmarkPost}
-          className="hover:text-yellow-400 flex items-center gap-2"
+          className="hover:text-yellow-400 flex items-center gap-2 transition"
         >
 
-          🔖
+          <span>
+            🔖
+          </span>
 
           <span>
             {post.bookmarks || 0}

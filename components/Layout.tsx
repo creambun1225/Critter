@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 
+import {
+  usePathname
+} from "next/navigation";
+
 export default function Layout({
   children,
   currentUser
@@ -10,6 +14,50 @@ export default function Layout({
   currentUser?: any;
 }) {
 
+  const pathname =
+    usePathname();
+
+  const menus = [
+
+    {
+      href: "/",
+      icon: "🏠",
+      label: "ホーム"
+    },
+
+    {
+      href: "/search",
+      icon: "🔎",
+      label: "検索"
+    },
+
+    {
+      href: "/notifications",
+      icon: "🔔",
+      label: "通知"
+    },
+
+    {
+      href:
+        `/user/${currentUser?.uid}`,
+      icon: "👤",
+      label: "プロフィール"
+    },
+
+    {
+      href: "/bookmarks",
+      icon: "🔖",
+      label: "ブックマーク"
+    },
+
+    {
+      href: "/settings",
+      icon: "⚙️",
+      label: "設定"
+    }
+
+  ];
+
   return (
 
     <div className="bg-black text-white min-h-screen flex justify-center">
@@ -17,107 +65,191 @@ export default function Layout({
       <div className="w-full max-w-7xl flex">
 
         {/* 左 */}
-        <div className="w-[260px] h-screen sticky top-0 border-r border-zinc-800 p-4 flex flex-col">
+        <div className="w-[275px] h-screen sticky top-0 border-r border-zinc-800 px-4 py-3 flex flex-col">
 
           {/* ロゴ */}
-          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-black text-3xl font-bold mb-8">
+          <Link
+            href="/"
+            className="w-14 h-14 rounded-full hover:bg-zinc-900 flex items-center justify-center text-3xl font-bold mb-4"
+          >
 
             C
 
-          </div>
+          </Link>
 
           {/* メニュー */}
-          <div className="flex flex-col gap-6 text-2xl font-bold">
+          <div className="flex flex-col gap-1">
 
-            <Link href="/">
-              🏠 ホーム
-            </Link>
+            {menus.map((menu) => (
 
-            <Link href="/search">
-              🔎 検索
-            </Link>
+              <Link
+                key={menu.href}
+                href={menu.href}
+                className={`
+                  flex items-center gap-5
+                  px-5 py-4
+                  rounded-full
+                  text-2xl
+                  font-bold
+                  transition
+                  hover:bg-zinc-900
 
-            <Link href="/notifications">
-              🔔 通知
-            </Link>
+                  ${pathname === menu.href
+                    ? "bg-zinc-900"
+                    : ""
+                  }
+                `}
+              >
 
-            <Link href={`/user/${currentUser?.uid}`}>
-              👤 プロフィール
-            </Link>
+                <span className="text-3xl">
 
-            <Link href="/bookmarks">
-              🔖 ブックマーク
-            </Link>
+                  {menu.icon}
 
-            <Link href="/settings">
-              ⚙️ 設定
-            </Link>
+                </span>
+
+                <span>
+
+                  {menu.label}
+
+                </span>
+
+              </Link>
+
+            ))}
 
           </div>
 
-          {/* ボタン */}
-          <button className="mt-auto bg-blue-500 hover:bg-blue-600 transition rounded-full py-3 text-xl font-bold">
+          {/* クリート */}
+          <button className="mt-6 bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-xl font-bold">
 
             クリート
 
           </button>
 
-          {/* バージョン */}
-          <div className="text-zinc-500 text-sm mt-4">
+          {/* ユーザー */}
+          <div className="mt-auto">
 
-            Critter v1.0.1
+            <Link
+              href={`/user/${currentUser?.uid}`}
+              className="flex items-center gap-3 hover:bg-zinc-900 rounded-full p-3 transition"
+            >
+
+              <img
+                src={
+                  currentUser?.photoURL ||
+                  "/default.png"
+                }
+                className="w-12 h-12 rounded-full object-cover bg-zinc-700"
+              />
+
+              <div className="min-w-0">
+
+                <div className="font-bold truncate">
+
+                  {currentUser?.displayName ||
+                    "ユーザー"}
+
+                </div>
+
+                <div className="text-zinc-500 text-sm truncate">
+
+                  @{
+                    currentUser?.email?.split(
+                      "@"
+                    )[0]
+                  }
+
+                </div>
+
+              </div>
+
+            </Link>
 
           </div>
 
         </div>
 
         {/* 真ん中 */}
-        <div className="flex-1 border-r border-l border-zinc-800 min-h-screen">
+        <main className="flex-1 border-r border-l border-zinc-800 min-h-screen max-w-[700px]">
 
           {children}
 
-        </div>
+        </main>
 
         {/* 右 */}
-        <div className="w-[350px] p-6">
+        <div className="w-[350px] p-4 hidden xl:block">
 
-          <div className="bg-zinc-900 rounded-3xl p-6 sticky top-6">
+          {/* 検索 */}
+          <div className="sticky top-4">
 
-            <div className="text-4xl font-bold mb-6">
+            <input
+              placeholder="検索"
+              className="w-full bg-zinc-900 rounded-full px-5 py-4 outline-none text-lg mb-4"
+            />
 
-              トレンド
+            {/* トレンド */}
+            <div className="bg-zinc-900 rounded-3xl overflow-hidden">
 
-            </div>
-
-            <div className="mb-5">
-
-              <div className="text-zinc-500 text-sm">
+              <div className="p-5 text-2xl font-bold border-b border-zinc-800">
 
                 トレンド
 
               </div>
 
-              <div className="font-bold text-3xl">
+              <div className="p-5 hover:bg-zinc-800 transition cursor-pointer">
 
-                #AI
+                <div className="text-zinc-500 text-sm">
+
+                  トレンド
+
+                </div>
+
+                <div className="font-bold text-xl">
+
+                  #AI
+
+                </div>
+
+              </div>
+
+              <div className="p-5 hover:bg-zinc-800 transition cursor-pointer">
+
+                <div className="text-zinc-500 text-sm">
+
+                  ゲーム
+
+                </div>
+
+                <div className="font-bold text-xl">
+
+                  #Minecraft
+
+                </div>
+
+              </div>
+
+              <div className="p-5 hover:bg-zinc-800 transition cursor-pointer">
+
+                <div className="text-zinc-500 text-sm">
+
+                  SNS
+
+                </div>
+
+                <div className="font-bold text-xl">
+
+                  #Critter
+
+                </div>
 
               </div>
 
             </div>
 
-            <div>
+            {/* バージョン */}
+            <div className="text-zinc-500 text-sm mt-4 px-2">
 
-              <div className="text-zinc-500 text-sm">
-
-                ゲーム
-
-              </div>
-
-              <div className="font-bold text-3xl">
-
-                #Minecraft
-
-              </div>
+              Critter v1.0.1
 
             </div>
 

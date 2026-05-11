@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { useParams } from "next/navigation";
+
 import Link from "next/link";
+
+import Layout from "@/components/Layout";
+import PostCard from "@/components/PostCard";
 
 import {
   db,
@@ -26,9 +31,11 @@ import {
 
 export default function UserProfile() {
 
-  const params = useParams();
+  const params =
+    useParams();
 
-  const uid = params.uid as string;
+  const uid =
+    params.uid as string;
 
   const [profile, setProfile] =
     useState<any>(null);
@@ -89,10 +96,11 @@ export default function UserProfile() {
   // 投稿取得
   useEffect(() => {
 
-    const q = query(
-      collection(db, "posts"),
-      where("uid", "==", uid)
-    );
+    const q =
+      query(
+        collection(db, "posts"),
+        where("uid", "==", uid)
+      );
 
     const unsub =
       onSnapshot(
@@ -143,7 +151,7 @@ export default function UserProfile() {
 
         }
 
-      } catch (e:any) {
+      } catch {
 
         alert(
           "再ログインしてください"
@@ -158,36 +166,28 @@ export default function UserProfile() {
 
   return (
 
-    <div className="bg-black min-h-screen text-white">
+    <Layout currentUser={me}>
 
       {/* ヘッダー */}
-      <div className="relative">
+      <div className="relative border-b border-zinc-800">
 
-        <div className="h-40 bg-zinc-700" />
+        {/* バナー */}
+        <div className="h-52 bg-zinc-700" />
 
         {/* アイコン */}
         <div className="absolute -bottom-16 left-6">
 
-          <div className="w-32 h-32 rounded-full border-4 border-black overflow-hidden bg-zinc-700">
-
-            {profile.icon ? (
-
-              <img
-                src={profile.icon}
-                className="w-full h-full object-cover"
-              />
-
-            ) : (
-
-              <div className="w-full h-full bg-zinc-700" />
-
-            )}
-
-          </div>
+          <img
+            src={
+              profile.icon ||
+              "/default.png"
+            }
+            className="w-32 h-32 rounded-full border-4 border-black object-cover bg-zinc-700"
+          />
 
         </div>
 
-        {/* 詳細ボタン */}
+        {/* 詳細 */}
         {me?.uid !== uid &&
           me?.uid && (
 
@@ -201,7 +201,9 @@ export default function UserProfile() {
               }
               className="text-3xl px-3 py-1 rounded-full hover:bg-zinc-800"
             >
+
               ⋯
+
             </button>
 
             {menuOpen && (
@@ -254,12 +256,14 @@ export default function UserProfile() {
       </div>
 
       {/* プロフィール */}
-      <div className="pt-20 px-6">
+      <div className="pt-20 px-6 border-b border-zinc-800 pb-6">
 
         <div className="flex items-center gap-2 flex-wrap">
 
           <h1 className="text-3xl font-bold">
+
             {profile.name}
+
           </h1>
 
           {/* 青認証 */}
@@ -285,14 +289,18 @@ export default function UserProfile() {
         </div>
 
         <p className="text-zinc-400 text-lg mt-1">
+
           @{profile.username}
+
         </p>
 
         <p className="mt-4 whitespace-pre-wrap">
+
           {profile.bio}
+
         </p>
 
-        {/* 自分の時 */}
+        {/* 自分 */}
         {me?.uid === uid && (
 
           <div className="mt-6 flex gap-3">
@@ -301,14 +309,18 @@ export default function UserProfile() {
               href="/profile/edit"
               className="px-4 py-2 rounded-full border border-zinc-700 hover:bg-zinc-900"
             >
+
               プロフィール編集
+
             </Link>
 
             <button
               onClick={deleteAccount}
               className="px-4 py-2 rounded-full bg-red-600 hover:bg-red-700"
             >
+
               アカウント削除
+
             </button>
 
           </div>
@@ -318,82 +330,21 @@ export default function UserProfile() {
       </div>
 
       {/* 投稿 */}
-      <div className="mt-10 border-t border-zinc-800">
+      <div>
 
         {posts.map((p:any) => (
 
-          <div
+          <PostCard
             key={p.id}
-            className="border-b border-zinc-800 p-4"
-          >
-
-            <div className="flex gap-3">
-
-              {/* アイコン */}
-              <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-700 flex-shrink-0">
-
-                {p.icon ? (
-
-                  <img
-                    src={p.icon}
-                    className="w-full h-full object-cover"
-                  />
-
-                ) : (
-
-                  <div className="w-full h-full bg-zinc-700" />
-
-                )}
-
-              </div>
-
-              <div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-
-                  <span className="font-bold">
-                    {p.name}
-                  </span>
-
-                  {p.verified && (
-
-                    <img
-                      src="/verified-blue.png"
-                      className="w-5 h-5"
-                    />
-
-                  )}
-
-                  {p.admin && (
-
-                    <img
-                      src="/verified-gold.png"
-                      className="w-5 h-5"
-                    />
-
-                  )}
-
-                  <span className="text-zinc-500">
-                    @{p.username}
-                  </span>
-
-                </div>
-
-                <p className="mt-2 whitespace-pre-wrap">
-                  {p.text}
-                </p>
-
-              </div>
-
-            </div>
-
-          </div>
+            post={p}
+            currentUser={me}
+          />
 
         ))}
 
       </div>
 
-    </div>
+    </Layout>
 
   );
 

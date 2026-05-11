@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import Layout from "@/components/Layout";
+
 import {
   auth,
   db
@@ -24,13 +26,16 @@ export default function SettingsPage() {
   const [userData, setUserData] =
     useState<any>(null);
 
+  const [currentUser, setCurrentUser] =
+    useState<any>(null);
+
   const [showAccount, setShowAccount] =
     useState(false);
 
   const [newPassword, setNewPassword] =
     useState("");
 
-  // ユーザー情報取得
+  // ユーザー取得
   useEffect(() => {
 
     return onAuthStateChanged(
@@ -45,6 +50,8 @@ export default function SettingsPage() {
           return;
 
         }
+
+        setCurrentUser(user);
 
         const snap =
           await getDoc(
@@ -115,7 +122,7 @@ export default function SettingsPage() {
 
         }
 
-      } catch (e:any) {
+      } catch {
 
         alert(
           "再ログインしてください"
@@ -153,7 +160,7 @@ export default function SettingsPage() {
 
         }
 
-      } catch (e:any) {
+      } catch {
 
         alert(
           "再ログインしてください"
@@ -168,117 +175,150 @@ export default function SettingsPage() {
 
   return (
 
-    <div className="bg-black min-h-screen text-white p-6">
+    <Layout currentUser={currentUser}>
 
-      <h1 className="text-3xl font-bold mb-6">
-        設定
-      </h1>
+      {/* タイトル */}
+      <div className="p-6 border-b border-zinc-800">
 
-      {/* アカウント情報ボタン */}
-      <button
-        onClick={() =>
-          setShowAccount(
-            !showAccount
-          )
-        }
-        className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4"
-      >
-        アカウント情報
-      </button>
+        <h1 className="text-4xl font-bold">
 
-      {/* 開いた時 */}
-      {showAccount && (
+          設定
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-6">
+        </h1>
 
-          {/* 名前 */}
-          <div className="mb-4">
+      </div>
 
-            <div className="text-zinc-500 text-sm">
-              ユーザー名
+      <div className="p-6">
+
+        {/* アカウント情報 */}
+        <button
+          onClick={() =>
+            setShowAccount(
+              !showAccount
+            )
+          }
+          className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-2xl p-4 text-left mb-4"
+        >
+
+          アカウント情報
+
+        </button>
+
+        {/* 開いた時 */}
+        {showAccount && (
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-6">
+
+            {/* 名前 */}
+            <div className="mb-4">
+
+              <div className="text-zinc-500 text-sm">
+
+                ユーザー名
+
+              </div>
+
+              <div className="text-lg">
+
+                {userData.name}
+
+              </div>
+
             </div>
 
-            <div className="text-lg">
-              {userData.name}
+            {/* username */}
+            <div className="mb-4">
+
+              <div className="text-zinc-500 text-sm">
+
+                @ユーザー名
+
+              </div>
+
+              <div className="text-lg">
+
+                @{userData.username}
+
+              </div>
+
+            </div>
+
+            {/* メール */}
+            <div className="mb-4">
+
+              <div className="text-zinc-500 text-sm">
+
+                メールアドレス
+
+              </div>
+
+              <div className="text-lg break-all">
+
+                {userData.email}
+
+              </div>
+
+            </div>
+
+            {/* パスワード変更 */}
+            <div>
+
+              <div className="text-zinc-500 text-sm mb-2">
+
+                パスワード変更
+
+              </div>
+
+              <input
+                type="password"
+                placeholder="新しいパスワード"
+                value={newPassword}
+                onChange={(e)=>
+                  setNewPassword(
+                    e.target.value
+                  )
+                }
+                className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-3 text-white"
+              />
+
+              <button
+                onClick={changePassword}
+                className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl"
+              >
+
+                パスワード変更
+
+              </button>
+
             </div>
 
           </div>
 
-          {/* @ */}
-          <div className="mb-4">
+        )}
 
-            <div className="text-zinc-500 text-sm">
-              @ユーザー名
-            </div>
+        {/* ログアウト */}
+        <button
+          onClick={logout}
+          className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-2xl p-4 text-left mb-4"
+        >
 
-            <div className="text-lg">
-              @{userData.username}
-            </div>
+          ログアウト
 
-          </div>
+        </button>
 
-          {/* メール */}
-          <div className="mb-4">
+        {/* アカウント削除 */}
+        <button
+          onClick={removeAccount}
+          className="w-full bg-red-600 hover:bg-red-700 rounded-2xl p-4 text-left"
+        >
 
-            <div className="text-zinc-500 text-sm">
-              メールアドレス
-            </div>
+          アカウント削除
 
-            <div className="text-lg break-all">
-              {userData.email}
-            </div>
+        </button>
 
-          </div>
+      </div>
 
-          {/* パスワード変更 */}
-          <div>
-
-            <div className="text-zinc-500 text-sm mb-2">
-              パスワード変更
-            </div>
-
-            <input
-              type="password"
-              placeholder="新しいパスワード"
-              value={newPassword}
-              onChange={(e) =>
-                setNewPassword(
-                  e.target.value
-                )
-              }
-              className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-3 text-white"
-            />
-
-            <button
-              onClick={changePassword}
-              className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl"
-            >
-              パスワード変更
-            </button>
-
-          </div>
-
-        </div>
-
-      )}
-
-      {/* ログアウト */}
-      <button
-        onClick={logout}
-        className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4"
-      >
-        ログアウト
-      </button>
-
-      {/* アカウント削除 */}
-      <button
-        onClick={removeAccount}
-        className="w-full bg-red-600 hover:bg-red-700 rounded-xl p-4 text-left"
-      >
-        アカウント削除
-      </button>
-
-    </div>
+    </Layout>
 
   );
 
