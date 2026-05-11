@@ -19,9 +19,8 @@ import {
   auth
 } from "@/lib/firebase";
 
-import PostCard from "@/components/PostCard";
-
 import Layout from "@/components/Layout";
+import PostCard from "@/components/PostCard";
 
 export default function Home() {
 
@@ -40,7 +39,7 @@ export default function Home() {
     const unsub =
       onAuthStateChanged(
         auth,
-        async (user) => {
+        (user) => {
 
           if (!user) {
 
@@ -115,17 +114,23 @@ export default function Home() {
           icon:
             currentUser.photoURL || "",
 
-          verified: false,
+          verified:
+            false,
 
-          adminVerified: false,
+          adminVerified:
+            false,
 
-          replies: 0,
+          replies:
+            0,
 
-          reposts: 0,
+          reposts:
+            0,
 
-          likes: 0,
+          likes:
+            0,
 
-          bookmarks: 0,
+          bookmarks:
+            0,
 
           createdAt:
             Date.now()
@@ -141,7 +146,7 @@ export default function Home() {
     <Layout currentUser={currentUser}>
 
       {/* タイトル */}
-      <div className="sticky top-0 z-50 bg-black/80 backdrop-blur border-b border-zinc-800 p-4">
+      <div className="sticky top-0 z-50 bg-black border-b border-zinc-800 p-4">
 
         <div className="text-5xl font-bold">
 
