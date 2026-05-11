@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import Layout from "@/components/Layout";
+
 import {
   auth,
   db
@@ -19,8 +21,8 @@ import {
 
 export default function EditProfilePage() {
 
-  const [uid, setUid] =
-    useState("");
+  const [currentUser, setCurrentUser] =
+    useState<any>(null);
 
   const [name, setName] =
     useState("");
@@ -34,7 +36,7 @@ export default function EditProfilePage() {
   const [icon, setIcon] =
     useState("");
 
-  // 読み込み
+  // ユーザー取得
   useEffect(() => {
 
     return onAuthStateChanged(
@@ -50,17 +52,16 @@ export default function EditProfilePage() {
 
         }
 
-        setUid(user.uid);
-
-        const ref =
-          doc(
-            db,
-            "users",
-            user.uid
-          );
+        setCurrentUser(user);
 
         const snap =
-          await getDoc(ref);
+          await getDoc(
+            doc(
+              db,
+              "users",
+              user.uid
+            )
+          );
 
         if (snap.exists()) {
 
@@ -94,13 +95,13 @@ export default function EditProfilePage() {
   const saveProfile =
     async () => {
 
-      if (!uid) return;
+      if (!currentUser) return;
 
       await updateDoc(
         doc(
           db,
           "users",
-          uid
+          currentUser.uid
         ),
         {
           name,
@@ -115,82 +116,70 @@ export default function EditProfilePage() {
       );
 
       location.href =
-        `/user/${uid}`;
-
-    };
-
-  // 画像アップロード
-  const uploadImage =
-    (
-      e:any
-    ) => {
-
-      const file =
-        e.target.files?.[0];
-
-      if (!file) return;
-
-      const reader =
-        new FileReader();
-
-      reader.onload =
-        () => {
-
-          setIcon(
-            reader.result as string
-          );
-
-        };
-
-      reader.readAsDataURL(
-        file
-      );
+        `/user/${currentUser.uid}`;
 
     };
 
   return (
 
-    <div className="bg-black min-h-screen text-white">
+    <Layout currentUser={currentUser}>
 
-      {/* 上 */}
-      <div className="border-b border-zinc-800 p-4 text-2xl font-bold">
+      {/* タイトル */}
+      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
 
-        プロフィール編集
+        <div className="text-4xl font-bold">
+
+          プロフィール編集
+
+        </div>
 
       </div>
 
-      <div className="p-6 max-w-2xl mx-auto">
+      {/* 内容 */}
+      <div className="p-6">
 
         {/* アイコン */}
         <div className="mb-6">
 
-          <div className="w-28 h-28 rounded-full overflow-hidden bg-zinc-800 mb-4">
+          <div className="text-zinc-400 mb-2">
 
-            {icon ? (
-
-              <img
-                src={icon}
-                className="w-full h-full object-cover"
-              />
-
-            ) : null}
+            アイコンURL
 
           </div>
 
           <input
-            type="file"
-            accept="image/*"
-            onChange={uploadImage}
-            className="text-sm"
+            value={icon}
+            onChange={(e)=>
+              setIcon(
+                e.target.value
+              )
+            }
+            placeholder="https://..."
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl p-4 outline-none"
+          />
+
+        </div>
+
+        {/* プレビュー */}
+        <div className="mb-8 flex justify-center">
+
+          <img
+            src={
+              icon ||
+              "/default.png"
+            }
+            className="w-32 h-32 rounded-full object-cover bg-zinc-700"
           />
 
         </div>
 
         {/* 名前 */}
-        <div className="mb-5">
+        <div className="mb-6">
 
-          <div className="mb-2 text-zinc-400">
+          <div className="text-zinc-400 mb-2">
+
             名前
+
           </div>
 
           <input
@@ -200,16 +189,19 @@ export default function EditProfilePage() {
                 e.target.value
               )
             }
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-4 text-white"
+            placeholder="名前"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl p-4 outline-none"
           />
 
         </div>
 
         {/* username */}
-        <div className="mb-5">
+        <div className="mb-6">
 
-          <div className="mb-2 text-zinc-400">
-            @ユーザー名
+          <div className="text-zinc-400 mb-2">
+
+            ユーザー名
+
           </div>
 
           <input
@@ -219,7 +211,8 @@ export default function EditProfilePage() {
                 e.target.value
               )
             }
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-4 text-white"
+            placeholder="username"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl p-4 outline-none"
           />
 
         </div>
@@ -227,8 +220,10 @@ export default function EditProfilePage() {
         {/* bio */}
         <div className="mb-6">
 
-          <div className="mb-2 text-zinc-400">
+          <div className="text-zinc-400 mb-2">
+
             自己紹介
+
           </div>
 
           <textarea
@@ -238,7 +233,8 @@ export default function EditProfilePage() {
                 e.target.value
               )
             }
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-4 text-white min-h-[120px]"
+            placeholder="自己紹介"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl p-4 outline-none resize-none min-h-[140px]"
           />
 
         </div>
@@ -246,14 +242,16 @@ export default function EditProfilePage() {
         {/* 保存 */}
         <button
           onClick={saveProfile}
-          className="bg-blue-500 hover:bg-blue-600 px-6 py-3 rounded-full font-bold"
+          className="w-full bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-xl font-bold"
         >
+
           保存
+
         </button>
 
       </div>
 
-    </div>
+    </Layout>
 
   );
 
