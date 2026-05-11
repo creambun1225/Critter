@@ -237,7 +237,7 @@ export default function HomePage() {
         {/* バージョン */}
         <div className="mt-auto text-zinc-500 text-sm">
 
-          Critter v1.0.2
+          Critter v1.0.1
 
         </div>
 
