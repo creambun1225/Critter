@@ -67,6 +67,36 @@ export default function PostCard({
   const likePost =
     async () => {
 
+      if (!currentUser)
+        return;
+
+      const likedUsers =
+        post.likedUsers || [];
+
+      const alreadyLiked =
+        likedUsers.includes(
+          currentUser.uid
+        );
+
+      let newLikedUsers;
+
+      if (alreadyLiked) {
+
+        newLikedUsers =
+          likedUsers.filter(
+            (id:string)=>
+              id !== currentUser.uid
+          );
+
+      } else {
+
+        newLikedUsers = [
+          ...likedUsers,
+          currentUser.uid
+        ];
+
+      }
+
       await updateDoc(
         doc(
           db,
@@ -74,8 +104,11 @@ export default function PostCard({
           post.id
         ),
         {
+          likedUsers:
+            newLikedUsers,
+
           likes:
-            (post.likes || 0) + 1
+            newLikedUsers.length
         }
       );
 
@@ -85,6 +118,36 @@ export default function PostCard({
   const repostPost =
     async () => {
 
+      if (!currentUser)
+        return;
+
+      const repostedUsers =
+        post.repostedUsers || [];
+
+      const alreadyReposted =
+        repostedUsers.includes(
+          currentUser.uid
+        );
+
+      let newRepostedUsers;
+
+      if (alreadyReposted) {
+
+        newRepostedUsers =
+          repostedUsers.filter(
+            (id:string)=>
+              id !== currentUser.uid
+          );
+
+      } else {
+
+        newRepostedUsers = [
+          ...repostedUsers,
+          currentUser.uid
+        ];
+
+      }
+
       await updateDoc(
         doc(
           db,
@@ -92,8 +155,11 @@ export default function PostCard({
           post.id
         ),
         {
+          repostedUsers:
+            newRepostedUsers,
+
           reposts:
-            (post.reposts || 0) + 1
+            newRepostedUsers.length
         }
       );
 
@@ -103,6 +169,36 @@ export default function PostCard({
   const bookmarkPost =
     async () => {
 
+      if (!currentUser)
+        return;
+
+      const bookmarkedUsers =
+        post.bookmarkedUsers || [];
+
+      const alreadyBookmarked =
+        bookmarkedUsers.includes(
+          currentUser.uid
+        );
+
+      let newBookmarkedUsers;
+
+      if (alreadyBookmarked) {
+
+        newBookmarkedUsers =
+          bookmarkedUsers.filter(
+            (id:string)=>
+              id !== currentUser.uid
+          );
+
+      } else {
+
+        newBookmarkedUsers = [
+          ...bookmarkedUsers,
+          currentUser.uid
+        ];
+
+      }
+
       await updateDoc(
         doc(
           db,
@@ -110,8 +206,11 @@ export default function PostCard({
           post.id
         ),
         {
+          bookmarkedUsers:
+            newBookmarkedUsers,
+
           bookmarks:
-            (post.bookmarks || 0) + 1
+            newBookmarkedUsers.length
         }
       );
 
