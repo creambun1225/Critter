@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import Layout from "@/components/Layout";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile
+} from "firebase/auth";
 
 import {
   auth,
@@ -10,95 +13,36 @@ import {
 } from "@/lib/firebase";
 
 import {
-  signOut,
-  deleteUser,
-  onAuthStateChanged,
-  updatePassword
-} from "firebase/auth";
-
-import {
   doc,
-  getDoc
+  setDoc
 } from "firebase/firestore";
 
-export default function SettingsPage() {
+export default function RegisterPage() {
 
-  const [userData, setUserData] =
-    useState<any>(null);
-
-  const [currentUser, setCurrentUser] =
-    useState<any>(null);
-
-  const [showAccount, setShowAccount] =
-    useState(false);
-
-  const [newPassword, setNewPassword] =
+  const [name, setName] =
     useState("");
 
-  // ユーザー取得
-  useEffect(() => {
+  const [username, setUsername] =
+    useState("");
 
-    return onAuthStateChanged(
-      auth,
-      async (user) => {
+  const [email, setEmail] =
+    useState("");
 
-        if (!user) {
+  const [password, setPassword] =
+    useState("");
 
-          location.href =
-            "/login";
-
-          return;
-
-        }
-
-        setCurrentUser(user);
-
-        const snap =
-          await getDoc(
-            doc(
-              db,
-              "users",
-              user.uid
-            )
-          );
-
-        if (snap.exists()) {
-
-          setUserData({
-
-            email:
-              user.email,
-
-            ...snap.data()
-
-          });
-
-        }
-
-      }
-    );
-
-  }, []);
-
-  // ログアウト
-  const logout =
+  const register =
     async () => {
 
-      await signOut(auth);
-
-      location.href =
-        "/login";
-
-    };
-
-  // パスワード変更
-  const changePassword =
-    async () => {
-
-      if (!newPassword) {
+      if (
+        !name ||
+        !username ||
+        !email ||
+        !password
+      ) {
 
         alert(
-          "新しいパスワード入力して"
+          "全部入力してください"
         );
 
         return;
@@ -107,218 +51,145 @@ export default function SettingsPage() {
 
       try {
 
-        if (auth.currentUser) {
-
-          await updatePassword(
-            auth.currentUser,
-            newPassword
+        const result =
+          await createUserWithEmailAndPassword(
+            auth,
+            email,
+            password
           );
 
-          alert(
-            "パスワード変更しました"
-          );
+        const user =
+          result.user;
 
-          setNewPassword("");
+        // authの名前
+        await updateProfile(
+          user,
+          {
+            displayName: name
+          }
+        );
 
-        }
+        // firestore保存
+        await setDoc(
+          doc(
+            db,
+            "users",
+            user.uid
+          ),
+          {
+            uid:
+              user.uid,
 
-      } catch {
+            name,
+
+            username,
+
+            email,
+
+            bio: "",
+
+            icon: "",
+
+            // 青認証
+            verified: false,
+
+            // 金認証
+            admin: false,
+
+            createdAt:
+              Date.now()
+          }
+        );
 
         alert(
-          "再ログインしてください"
+          "登録成功"
+        );
+
+        location.href =
+          "/";
+
+      } catch (e:any) {
+
+        alert(
+          e.message
         );
 
       }
 
     };
-
-  // アカウント削除
-  const removeAccount =
-    async () => {
-
-      const ok =
-        confirm(
-          "本当にアカウント削除しますか？"
-        );
-
-      if (!ok) return;
-
-      try {
-
-        if (auth.currentUser) {
-
-          await deleteUser(
-            auth.currentUser
-          );
-
-          alert(
-            "アカウント削除しました"
-          );
-
-          location.href =
-            "/login";
-
-        }
-
-      } catch {
-
-        alert(
-          "再ログインしてください"
-        );
-
-      }
-
-    };
-
-  if (!userData)
-    return null;
 
   return (
 
-    <Layout currentUser={currentUser}>
+    <div className="bg-black min-h-screen flex items-center justify-center text-white">
 
-      {/* タイトル */}
-      <div className="p-6 border-b border-zinc-800">
+      <div className="w-full max-w-md bg-zinc-900 rounded-3xl p-8">
 
-        <h1 className="text-4xl font-bold">
+        <h1 className="text-4xl font-bold mb-8 text-center">
 
-          設定
+          新規登録
 
         </h1>
 
-      </div>
-
-      <div className="p-6">
-
-        {/* アカウント情報 */}
-        <button
-          onClick={() =>
-            setShowAccount(
-              !showAccount
+        <input
+          type="text"
+          placeholder="名前"
+          value={name}
+          onChange={(e)=>
+            setName(
+              e.target.value
             )
           }
-          className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-2xl p-4 text-left mb-4"
-        >
+          className="w-full bg-black border border-zinc-700 rounded-xl p-4 mb-4 outline-none"
+        />
 
-          アカウント情報
+        <input
+          type="text"
+          placeholder="@ユーザー名"
+          value={username}
+          onChange={(e)=>
+            setUsername(
+              e.target.value
+            )
+          }
+          className="w-full bg-black border border-zinc-700 rounded-xl p-4 mb-4 outline-none"
+        />
 
-        </button>
+        <input
+          type="email"
+          placeholder="メール"
+          value={email}
+          onChange={(e)=>
+            setEmail(
+              e.target.value
+            )
+          }
+          className="w-full bg-black border border-zinc-700 rounded-xl p-4 mb-4 outline-none"
+        />
 
-        {/* 開いた時 */}
-        {showAccount && (
+        <input
+          type="password"
+          placeholder="パスワード"
+          value={password}
+          onChange={(e)=>
+            setPassword(
+              e.target.value
+            )
+          }
+          className="w-full bg-black border border-zinc-700 rounded-xl p-4 mb-6 outline-none"
+        />
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-6">
-
-            {/* 名前 */}
-            <div className="mb-4">
-
-              <div className="text-zinc-500 text-sm">
-
-                ユーザー名
-
-              </div>
-
-              <div className="text-lg">
-
-                {userData.name}
-
-              </div>
-
-            </div>
-
-            {/* username */}
-            <div className="mb-4">
-
-              <div className="text-zinc-500 text-sm">
-
-                @ユーザー名
-
-              </div>
-
-              <div className="text-lg">
-
-                @{userData.username}
-
-              </div>
-
-            </div>
-
-            {/* メール */}
-            <div className="mb-4">
-
-              <div className="text-zinc-500 text-sm">
-
-                メールアドレス
-
-              </div>
-
-              <div className="text-lg break-all">
-
-                {userData.email}
-
-              </div>
-
-            </div>
-
-            {/* パスワード変更 */}
-            <div>
-
-              <div className="text-zinc-500 text-sm mb-2">
-
-                パスワード変更
-
-              </div>
-
-              <input
-                type="password"
-                placeholder="新しいパスワード"
-                value={newPassword}
-                onChange={(e)=>
-                  setNewPassword(
-                    e.target.value
-                  )
-                }
-                className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-3 text-white"
-              />
-
-              <button
-                onClick={changePassword}
-                className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl"
-              >
-
-                パスワード変更
-
-              </button>
-
-            </div>
-
-          </div>
-
-        )}
-
-        {/* ログアウト */}
         <button
-          onClick={logout}
-          className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-2xl p-4 text-left mb-4"
+          onClick={register}
+          className="w-full bg-blue-500 hover:bg-blue-600 transition rounded-xl py-4 text-xl font-bold"
         >
 
-          ログアウト
-
-        </button>
-
-        {/* アカウント削除 */}
-        <button
-          onClick={removeAccount}
-          className="w-full bg-red-600 hover:bg-red-700 rounded-2xl p-4 text-left"
-        >
-
-          アカウント削除
+          登録
 
         </button>
 
       </div>
 
-    </Layout>
+    </div>
 
   );
 

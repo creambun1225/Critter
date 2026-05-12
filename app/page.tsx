@@ -54,6 +54,7 @@ export default function Home() {
     const unsub =
       onAuthStateChanged(
         auth,
+
         async (user) => {
 
           if (!user) {
@@ -64,8 +65,6 @@ export default function Home() {
             return;
 
           }
-
-          setCurrentUser(user);
 
           const snap =
             await getDoc(
@@ -78,13 +77,25 @@ export default function Home() {
 
           if (snap.exists()) {
 
-            setUserData(
-              snap.data()
-            );
+            const data =
+              snap.data();
+
+            setCurrentUser({
+              uid: user.uid,
+              email: user.email,
+              photoURL:
+                user.photoURL,
+              displayName:
+                user.displayName,
+              ...data
+            });
+
+            setUserData(data);
 
           }
 
         }
+
       );
 
     return () => unsub();
@@ -158,6 +169,7 @@ export default function Home() {
           /#\w+/g
         ) || [];
 
+      // 投稿保存
       await addDoc(
         collection(db, "posts"),
         {
@@ -184,11 +196,11 @@ export default function Home() {
             "",
 
           verified:
-            userData?.verified ||
+            currentUser?.verified ||
             false,
 
-          adminVerified:
-            userData?.admin ||
+          admin:
+            currentUser?.admin ||
             false,
 
           replies:
@@ -231,6 +243,7 @@ export default function Home() {
       {/* 投稿フォーム */}
       <div className="border-b border-zinc-800 p-4 flex gap-4">
 
+        {/* アイコン */}
         <img
           src={
             userData?.icon ||
@@ -241,6 +254,7 @@ export default function Home() {
 
         <div className="flex-1">
 
+          {/* テキスト */}
           <textarea
             value={text}
             onChange={(e)=>
@@ -278,6 +292,7 @@ export default function Home() {
 
           )}
 
+          {/* ボタン */}
           <div className="flex justify-end mt-4">
 
             <button
@@ -295,7 +310,7 @@ export default function Home() {
 
       </div>
 
-      {/* 投稿 */}
+      {/* 投稿一覧 */}
       <div>
 
         {posts.map((post:any)=>(
@@ -303,10 +318,7 @@ export default function Home() {
           <PostCard
             key={post.id}
             post={post}
-            currentUser={{
-              ...currentUser,
-              ...userData
-            }}
+            currentUser={currentUser}
           />
 
         ))}

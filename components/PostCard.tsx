@@ -5,23 +5,15 @@ import { useState } from "react";
 import Link from "next/link";
 
 import {
-  formatDistanceToNow
-} from "date-fns";
-
-import {
-  ja
-} from "date-fns/locale";
-
-import {
   db
 } from "@/lib/firebase";
 
 import {
   doc,
   deleteDoc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove
+  addDoc,
+  collection,
+  updateDoc
 } from "firebase/firestore";
 
 export default function PostCard({
@@ -32,43 +24,28 @@ export default function PostCard({
   const [open, setOpen] =
     useState(false);
 
-  // フォロー
-  const follow =
+  // 通報
+  const reportPost =
     async () => {
 
-      await updateDoc(
-        doc(
+      await addDoc(
+        collection(
           db,
-          "users",
-          post.uid
+          "reports"
         ),
         {
-          followers:
-            arrayUnion(
-              currentUser.uid
-            )
+          postId: post.id,
+          text: post.text,
+          createdAt:
+            Date.now()
         }
       );
 
-    };
-
-  // フォロー解除
-  const unfollow =
-    async () => {
-
-      await updateDoc(
-        doc(
-          db,
-          "users",
-          post.uid
-        ),
-        {
-          followers:
-            arrayRemove(
-              currentUser.uid
-            )
-        }
+      alert(
+        "通報しました"
       );
+
+      setOpen(false);
 
     };
 
@@ -86,17 +63,63 @@ export default function PostCard({
 
     };
 
-  const isFollowing =
+  // いいね
+  const likePost =
+    async () => {
 
-    post.followers?.includes(
-      currentUser?.uid
-    );
+      await updateDoc(
+        doc(
+          db,
+          "posts",
+          post.id
+        ),
+        {
+          likes:
+            (post.likes || 0) + 1
+        }
+      );
+
+    };
+
+  // リポスト
+  const repostPost =
+    async () => {
+
+      await updateDoc(
+        doc(
+          db,
+          "posts",
+          post.id
+        ),
+        {
+          reposts:
+            (post.reposts || 0) + 1
+        }
+      );
+
+    };
+
+  // ブックマーク
+  const bookmarkPost =
+    async () => {
+
+      await updateDoc(
+        doc(
+          db,
+          "posts",
+          post.id
+        ),
+        {
+          bookmarks:
+            (post.bookmarks || 0) + 1
+        }
+      );
+
+    };
 
   const canDelete =
-
     currentUser?.uid ===
       post.uid ||
-
     currentUser?.admin;
 
   return (
@@ -104,11 +127,12 @@ export default function PostCard({
     <div className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">
 
       {/* 上 */}
-      <div className="flex justify-between gap-3">
+      <div className="flex justify-between items-start gap-3">
 
+        {/* 左 */}
         <Link
           href={`/user/${post.uid}`}
-          className="flex gap-3 flex-1 min-w-0"
+          className="flex gap-3 flex-1"
         >
 
           {/* アイコン */}
@@ -117,21 +141,22 @@ export default function PostCard({
               post.icon ||
               "/default.png"
             }
-            className="w-12 h-12 rounded-full object-cover bg-zinc-700 flex-shrink-0"
+            className="w-12 h-12 rounded-full object-cover shrink-0 bg-zinc-700"
           />
 
-          <div className="min-w-0 flex-1">
+          {/* 本体 */}
+          <div className="flex-1 min-w-0">
 
             {/* 名前 */}
             <div className="flex items-center gap-2 flex-wrap">
 
-              <div className="font-bold truncate">
+              <div className="font-bold text-white text-[17px]">
 
                 {post.name}
 
               </div>
 
-              {/* 青 */}
+              {/* 青認証 */}
               {post.verified && (
 
                 <img
@@ -141,8 +166,8 @@ export default function PostCard({
 
               )}
 
-              {/* 金 */}
-              {post.adminVerified && (
+              {/* 金認証 */}
+              {post.admin && (
 
                 <img
                   src="/verified-gold.png"
@@ -151,7 +176,7 @@ export default function PostCard({
 
               )}
 
-              <div className="text-zinc-500 truncate">
+              <div className="text-zinc-500">
 
                 @{post.username}
 
@@ -160,26 +185,16 @@ export default function PostCard({
               {/* 時間 */}
               <div className="text-zinc-500 text-sm">
 
-                · {
-
-                  formatDistanceToNow(
-                    new Date(
-                      post.createdAt
-                    ),
-                    {
-                      addSuffix: true,
-                      locale: ja
-                    }
-                  )
-
-                }
+                · {new Date(
+                  post.createdAt
+                ).toLocaleString("ja-JP")}
 
               </div>
 
             </div>
 
             {/* 本文 */}
-            <div className="mt-2 whitespace-pre-wrap break-words">
+            <div className="mt-2 whitespace-pre-wrap break-words text-[16px]">
 
               {post.text}
 
@@ -190,47 +205,118 @@ export default function PostCard({
 
               <img
                 src={post.image}
-                className="mt-4 rounded-2xl w-full max-h-[500px] object-cover border border-zinc-800"
+                className="mt-4 rounded-2xl max-h-[500px] object-cover border border-zinc-800"
               />
 
             )}
 
             {/* ハッシュタグ */}
-            <div className="flex gap-2 flex-wrap mt-3">
+            {post.hashtags?.length > 0 && (
 
-              {(post.hashtags || [])
-                .map((tag:string)=>(
+              <div className="flex flex-wrap gap-2 mt-3">
 
-                <div
-                  key={tag}
-                  className="text-sky-400"
-                >
+                {post.hashtags.map(
+                  (
+                    tag:string,
+                    index:number
+                  ) => (
 
-                  {tag}
+                    <div
+                      key={index}
+                      className="text-blue-400"
+                    >
 
-                </div>
+                      {tag}
 
-              ))}
+                    </div>
 
-            </div>
+                  )
+                )}
 
-            {/* ボタン */}
+              </div>
+
+            )}
+
+            {/* 下ボタン */}
             <div className="flex justify-between mt-5 max-w-md text-zinc-500">
 
-              <button>
-                💬 {post.replies || 0}
+              {/* リプ */}
+              <button className="hover:text-sky-400 flex items-center gap-2 transition">
+
+                <span>
+                  💬
+                </span>
+
+                <span>
+                  {post.replies || 0}
+                </span>
+
               </button>
 
-              <button>
-                🔁 {post.reposts || 0}
+              {/* リポスト */}
+              <button
+                onClick={(e)=>{
+
+                  e.preventDefault();
+
+                  repostPost();
+
+                }}
+                className="hover:text-green-400 flex items-center gap-2 transition"
+              >
+
+                <span>
+                  🔁
+                </span>
+
+                <span>
+                  {post.reposts || 0}
+                </span>
+
               </button>
 
-              <button>
-                ❤️ {post.likes || 0}
+              {/* いいね */}
+              <button
+                onClick={(e)=>{
+
+                  e.preventDefault();
+
+                  likePost();
+
+                }}
+                className="hover:text-pink-400 flex items-center gap-2 transition"
+              >
+
+                <span>
+                  ❤️
+                </span>
+
+                <span>
+                  {post.likes || 0}
+                </span>
+
               </button>
 
-              <button>
-                🔖 {post.bookmarks || 0}
+              {/* ブックマーク */}
+              <button
+                onClick={(e)=>{
+
+                  e.preventDefault();
+
+                  bookmarkPost();
+
+                }}
+                className="hover:text-yellow-400 flex items-center gap-2 transition"
+              >
+
+                <span>
+                  🔖
+                </span>
+
+                <span>
+                  {post.bookmarks || 0}
+                </span>
+
               </button>
 
             </div>
@@ -239,65 +325,51 @@ export default function PostCard({
 
         </Link>
 
-        {/* 右 */}
-        <div className="flex flex-col items-end gap-2">
+        {/* メニュー */}
+        <div className="relative">
 
-          {/* 詳細 */}
-          <div className="relative">
+          <button
+            onClick={()=>
+              setOpen(!open)
+            }
+            className="text-zinc-500 hover:text-white text-2xl px-2"
+          >
 
-            <button
-              onClick={()=>
-                setOpen(!open)
-              }
-              className="text-2xl text-zinc-500 hover:text-white"
-            >
-              ⋯
-            </button>
+            ⋯
 
-            {open && (
+          </button>
 
-              <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-56 z-50">
+          {open && (
 
-                {/* フォロー */}
-                {currentUser?.uid !==
-                  post.uid && (
+            <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-56 z-50 shadow-2xl">
 
-                  <button
-                    onClick={
-                      isFollowing
-                        ? unfollow
-                        : follow
-                    }
-                    className="w-full text-left px-4 py-3 hover:bg-zinc-900"
-                  >
+              {/* 通報 */}
+              <button
+                onClick={reportPost}
+                className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-400"
+              >
 
-                    {isFollowing
-                      ? "フォロー解除"
-                      : "フォロー"}
+                このクリートを通報
 
-                  </button>
+              </button>
 
-                )}
+              {/* 削除 */}
+              {canDelete && (
 
-                {/* 削除 */}
-                {canDelete && (
+                <button
+                  onClick={deletePost}
+                  className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-500 border-t border-zinc-800"
+                >
 
-                  <button
-                    onClick={deletePost}
-                    className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-500 border-t border-zinc-800"
-                  >
+                  クリートを削除
 
-                    クリートを削除
+                </button>
 
-                  </button>
+              )}
 
-                )}
+            </div>
 
-              </div>
-
-            )}
-
-          </div>
+          )}
 
         </div>
 

@@ -1,106 +1,196 @@
 "use client";
 
 import { useState } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import Link from "next/link";
 
-export default function Register() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [gender, setGender] = useState("その他");
-  const [error, setError] = useState("");
+import {
+  createUserWithEmailAndPassword,
+  updateProfile
+} from "firebase/auth";
 
-  const handleRegister = async () => {
-    setError("");
+import {
+  auth,
+  db
+} from "@/lib/firebase";
 
-    if (!username || !password) {
-      setError("ユーザー名とパスワードは必須！");
-      return;
-    }
+import {
+  doc,
+  setDoc
+} from "firebase/firestore";
 
-    if (password.length < 6) {
-      setError("パスワードは6文字以上にして！");
-      return;
-    }
+export default function RegisterPage() {
 
-    try {
-      await createUserWithEmailAndPassword(
-        auth,
-        username + "@critter.com",
-        password
-      );
+  const [name, setName] =
+    useState("");
 
-      alert("登録成功！");
-      window.location.href = "/";
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
+  const [username, setUsername] =
+    useState("");
+
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const register =
+    async () => {
+
+      if (
+        !name ||
+        !username ||
+        !email ||
+        !password
+      ) {
+
+        alert(
+          "全部入力してください"
+        );
+
+        return;
+
+      }
+
+      try {
+
+        const result =
+          await createUserWithEmailAndPassword(
+            auth,
+            email,
+            password
+          );
+
+        const user =
+          result.user;
+
+        // authの名前
+        await updateProfile(
+          user,
+          {
+            displayName: name
+          }
+        );
+
+        // firestore保存
+        await setDoc(
+          doc(
+            db,
+            "users",
+            user.uid
+          ),
+          {
+            uid:
+              user.uid,
+
+            name,
+
+            username,
+
+            email,
+
+            bio: "",
+
+            icon: "",
+
+            // 青認証
+            verified: false,
+
+            // 金認証
+            admin: false,
+
+            createdAt:
+              Date.now()
+          }
+        );
+
+        alert(
+          "登録成功"
+        );
+
+        location.href =
+          "/";
+
+      } catch (e:any) {
+
+        alert(
+          e.message
+        );
+
+      }
+
+    };
 
   return (
-    <main className="flex justify-center items-center min-h-screen bg-gray-100">
-      <div className="w-[400px] bg-white p-6 rounded-xl shadow">
-        
-        {/* ロゴ */}
-        <div className="flex justify-center mb-4">
-          <div className="w-12 h-12 bg-blue-500 rounded-full"></div>
-        </div>
 
-        <h1 className="text-2xl font-bold text-center mb-2">
-          アカウント作成
+    <div className="bg-black min-h-screen flex items-center justify-center text-white">
+
+      <div className="w-full max-w-md bg-zinc-900 rounded-3xl p-8">
+
+        <h1 className="text-4xl font-bold mb-8 text-center">
+
+          新規登録
+
         </h1>
 
-        <p className="text-center text-sm text-gray-500 mb-4">
-          または{" "}
-          <Link href="/login" className="text-blue-500">
-            ログインはこちら
-          </Link>
-        </p>
-
-        {/* エラー表示 */}
-        {error && (
-          <p className="text-red-500 text-sm mb-2 text-center">
-            {error}
-          </p>
-        )}
-
-        {/* ユーザー名 */}
         <input
-          placeholder="ユーザー名"
-          className="w-full border p-3 rounded mb-3"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          type="text"
+          placeholder="名前"
+          value={name}
+          onChange={(e)=>
+            setName(
+              e.target.value
+            )
+          }
+          className="w-full bg-black border border-zinc-700 rounded-xl p-4 mb-4 outline-none"
         />
 
-        {/* 性別 */}
-        <select
-          className="w-full border p-3 rounded mb-3"
-          value={gender}
-          onChange={(e) => setGender(e.target.value)}
-        >
-          <option>男性</option>
-          <option>女性</option>
-          <option>その他</option>
-        </select>
+        <input
+          type="text"
+          placeholder="@ユーザー名"
+          value={username}
+          onChange={(e)=>
+            setUsername(
+              e.target.value
+            )
+          }
+          className="w-full bg-black border border-zinc-700 rounded-xl p-4 mb-4 outline-none"
+        />
 
-        {/* パスワード */}
+        <input
+          type="email"
+          placeholder="メール"
+          value={email}
+          onChange={(e)=>
+            setEmail(
+              e.target.value
+            )
+          }
+          className="w-full bg-black border border-zinc-700 rounded-xl p-4 mb-4 outline-none"
+        />
+
         <input
           type="password"
-          placeholder="パスワード（6文字以上）"
-          className="w-full border p-3 rounded mb-3"
+          placeholder="パスワード"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e)=>
+            setPassword(
+              e.target.value
+            )
+          }
+          className="w-full bg-black border border-zinc-700 rounded-xl p-4 mb-6 outline-none"
         />
 
-        {/* 登録ボタン */}
         <button
-          onClick={handleRegister}
-          className="w-full bg-black text-white py-3 rounded font-bold"
+          onClick={register}
+          className="w-full bg-blue-500 hover:bg-blue-600 transition rounded-xl py-4 text-xl font-bold"
         >
-          アカウント作成
+
+          登録
+
         </button>
+
       </div>
-    </main>
+
+    </div>
+
   );
+
 }
