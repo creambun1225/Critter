@@ -26,7 +26,7 @@ const firebaseConfig = {
     "critter-3c31b",
 
   storageBucket:
-    "critter-3c31b.firebasestorage.app",
+    "critter-3c31b.appspot.com",
 
   messagingSenderId:
     "154125669854",
