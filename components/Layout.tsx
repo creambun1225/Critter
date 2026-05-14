@@ -70,10 +70,13 @@ export default function Layout({
           {/* ロゴ */}
           <Link
             href="/"
-            className="w-14 h-14 rounded-full hover:bg-zinc-900 flex items-center justify-center text-3xl font-bold mb-4"
+            className="mb-4"
           >
 
-            C
+            <img
+              src="/logo.png"
+              className="w-14 h-14 rounded-2xl object-cover hover:opacity-80 transition"
+            />
 
           </Link>
 
@@ -137,6 +140,7 @@ export default function Layout({
               <img
                 src={
                   currentUser?.photoURL ||
+                  currentUser?.icon ||
                   "/default.png"
                 }
                 className="w-12 h-12 rounded-full object-cover bg-zinc-700"
@@ -147,6 +151,7 @@ export default function Layout({
                 <div className="font-bold truncate">
 
                   {currentUser?.displayName ||
+                    currentUser?.name ||
                     "ユーザー"}
 
                 </div>
@@ -154,9 +159,8 @@ export default function Layout({
                 <div className="text-zinc-500 text-sm truncate">
 
                   @{
-                    currentUser?.email?.split(
-                      "@"
-                    )[0]
+                    currentUser?.username ||
+                    currentUser?.email?.split("@")[0]
                   }
 
                 </div>
@@ -181,13 +185,11 @@ export default function Layout({
 
           <div className="sticky top-4">
 
-            {/* 検索 */}
             <input
               placeholder="検索"
               className="w-full bg-zinc-900 rounded-full px-5 py-4 outline-none text-lg mb-4"
             />
 
-            {/* トレンド */}
             <div className="bg-zinc-900 rounded-3xl overflow-hidden">
 
               <div className="p-5 text-2xl font-bold border-b border-zinc-800">
@@ -246,7 +248,6 @@ export default function Layout({
 
             </div>
 
-            {/* バージョン */}
             <div className="text-zinc-500 text-sm mt-4 px-2">
 
               Critter v1.0.1
@@ -259,33 +260,36 @@ export default function Layout({
 
       </div>
 
-      {/* モバイル下メニュー */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around py-3 md:hidden z-50">
+{/* モバイル下メニュー */}
+<div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around py-3 md:hidden z-50">
 
-        <Link href="/">
-          🏠
-        </Link>
+  <Link href="/">
+    🏠
+  </Link>
 
-        <Link href="/search">
-          🔎
-        </Link>
+  <Link href="/search">
+    🔎
+  </Link>
 
-        <Link href="/notifications">
-          🔔
-        </Link>
+  <Link href="/notifications">
+    🔔
+  </Link>
 
-        <Link href="/bookmarks">
-          🔖
-        </Link>
+  <Link href="/bookmarks">
+    🔖
+  </Link>
 
-        <Link href={`/user/${currentUser?.uid}`}>
-          👤
-        </Link>
+  <Link href={`/user/${currentUser?.uid}`}>
+    👤
+  </Link>
 
-      </div>
+  <Link href="/settings">
+    ⚙️
+  </Link>
 
-    </div>
+</div>
 
-  );
+</div>
 
+);
 }
