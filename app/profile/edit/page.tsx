@@ -1,165 +1,168 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db, storage } from "@/lib/firebase";
+import Layout from "@/components/Layout";
+import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import Layout from "@/components/Layout";
 
-export default function EditProfilePage() {
+export default function EditProfilePage(){
 
-  const [currentUser,setCurrentUser]=useState<any>(null);
-  const [name,setName]=useState("");
-  const [username,setUsername]=useState("");
-  const [bio,setBio]=useState("");
-  const [icon,setIcon]=useState("");
-  const [image,setImage]=useState<any>(null);
+const [currentUser,setCurrentUser]=useState<any>(null);
+const [name,setName]=useState("");
+const [username,setUsername]=useState("");
+const [bio,setBio]=useState("");
+const [icon,setIcon]=useState("");
+const [image,setImage]=useState<any>(null);
 
-  useEffect(()=>{
+useEffect(()=>{
 
-    const unsub=
-    onAuthStateChanged(
-      auth,
-      async(user)=>{
+const unsub=
+onAuthStateChanged(
+auth,
+async(user)=>{
 
-        if(!user){
-          location.href="/login";
-          return;
-        }
+if(!user){
+location.href="/login";
+return;
+}
 
-        setCurrentUser(user);
+setCurrentUser(user);
 
-        const snap=
-        await getDoc(
-          doc(db,"users",user.uid)
-        );
+const snap=
+await getDoc(
+doc(db,"users",user.uid)
+);
 
-        if(snap.exists()){
+if(snap.exists()){
+const data=snap.data();
+setName(data.name||"");
+setUsername(data.username||"");
+setBio(data.bio||"");
+setIcon(data.icon||"");
+}
 
-          const data=snap.data();
+}
+);
 
-          setName(data.name||"");
-          setUsername(data.username||"");
-          setBio(data.bio||"");
-          setIcon(data.icon||"");
+return ()=>unsub();
 
-        }
+},[]);
 
-      }
-    );
+const saveProfile=async()=>{
 
-    return()=>unsub();
+try{
 
-  },[]);
+if(!currentUser)return;
 
-  const saveProfile=async()=>{
+let iconUrl=icon;
 
-    if(!currentUser)return;
+if(image){
 
-    let iconUrl=icon;
+const formData=new FormData();
 
-    if(image){
+formData.append(
+"file",
+image
+);
 
-      const imageRef=
-      ref(
-        storage,
-        `icons/${Date.now()}_${image.name}`
-      );
+formData.append(
+"upload_preset",
+"critter_upload"
+);
 
-      await uploadBytes(
-        imageRef,
-        image
-      );
+const res=
+await fetch(
+"https://api.cloudinary.com/v1_1/dp16ulupy/image/upload",
+{
+method:"POST",
+body:formData
+}
+);
 
-      iconUrl=
-      await getDownloadURL(
-        imageRef
-      );
+const data=
+await res.json();
 
-    }
+iconUrl=data.secure_url;
 
-    await updateDoc(
-      doc(db,"users",currentUser.uid),
-      {
-        name,
-        username,
-        bio,
-        icon:iconUrl
-      }
-    );
+}
 
-    alert("保存しました");
-    location.href=`/user/${currentUser.uid}`;
+await updateDoc(
+doc(
+db,
+"users",
+currentUser.uid
+),
+{
+name,
+username,
+bio,
+icon:iconUrl
+}
+);
 
-  };
+alert("保存しました");
+location.href=`/user/${currentUser.uid}`;
 
-  return(
+}catch(e){
+console.log(e);
+alert("保存失敗");
+}
 
-    <Layout currentUser={currentUser}>
+};
 
-      <div className="p-6 text-white">
+return(
+<Layout currentUser={currentUser}>
+<div className="p-6 text-white">
 
-        <h1 className="text-3xl font-bold mb-6">
-          プロフィール編集
-        </h1>
+<h1 className="text-3xl font-bold mb-6">
+プロフィール編集
+</h1>
 
-        <div className="space-y-6">
+<div className="space-y-5">
 
-          <div>
-            <div className="mb-2">名前</div>
-            <input
-            value={name}
-            onChange={(e)=>setName(e.target.value)}
-            className="w-full bg-zinc-900 rounded-xl p-3 border border-zinc-700"
-            />
-          </div>
+<input
+value={name}
+onChange={(e)=>setName(e.target.value)}
+placeholder="名前"
+className="w-full bg-zinc-900 p-3 rounded-xl"
+/>
 
-          <div>
-            <div className="mb-2">ユーザー名</div>
-            <input
-            value={username}
-            onChange={(e)=>setUsername(e.target.value)}
-            className="w-full bg-zinc-900 rounded-xl p-3 border border-zinc-700"
-            />
-          </div>
+<input
+value={username}
+onChange={(e)=>setUsername(e.target.value)}
+placeholder="ユーザー名"
+className="w-full bg-zinc-900 p-3 rounded-xl"
+/>
 
-          <div>
-            <div className="mb-2">自己紹介</div>
-            <textarea
-            value={bio}
-            onChange={(e)=>setBio(e.target.value)}
-            className="w-full bg-zinc-900 rounded-xl p-3 border border-zinc-700 min-h-[120px]"
-            />
-          </div>
+<textarea
+value={bio}
+onChange={(e)=>setBio(e.target.value)}
+placeholder="自己紹介"
+className="w-full bg-zinc-900 p-3 rounded-xl min-h-[120px]"
+/>
 
-          <div>
-            <div className="mb-2">アイコン</div>
+<input
+type="file"
+accept="image/*"
+onChange={(e)=>setImage(e.target.files?.[0])}
+/>
 
-            <input
-            type="file"
-            accept="image/*"
-            onChange={(e)=>setImage(e.target.files?.[0])}
-            />
+<img
+src={image?URL.createObjectURL(image):(icon||"/default.png")}
+className="w-32 h-32 rounded-full object-cover"
+/>
 
-            <img
-            src={image?URL.createObjectURL(image):(icon||"/default.png")}
-            className="w-32 h-32 rounded-full object-cover mt-4 border border-zinc-700"
-            />
-          </div>
+<button
+onClick={saveProfile}
+className="bg-blue-500 px-6 py-3 rounded-full font-bold"
+>
+保存
+</button>
 
-          <button
-          onClick={saveProfile}
-          className="bg-blue-500 hover:bg-blue-600 px-6 py-3 rounded-full font-bold"
-          >
-            保存
-          </button>
+</div>
 
-        </div>
-
-      </div>
-
-    </Layout>
-
-  );
+</div>
+</Layout>
+);
 }
