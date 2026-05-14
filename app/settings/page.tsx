@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import Link from "next/link";
 import Layout from "@/components/Layout";
 
 import {
@@ -36,327 +36,198 @@ export default function SettingsPage() {
   const [adminPassword, setAdminPassword] =
     useState("");
 
-  // ログイン確認
   useEffect(() => {
 
     const unsub =
       onAuthStateChanged(
         auth,
-
         async (user) => {
 
           if (!user) {
-
-            location.href =
-              "/login";
-
+            location.href = "/login";
             return;
-
           }
 
           setCurrentUser(user);
 
-          const ref =
-            doc(
-              db,
-              "users",
-              user.uid
-            );
-
-          const snap =
-            await getDoc(ref);
+          const snap = await getDoc(
+            doc(db,"users",user.uid)
+          );
 
           if (snap.exists()) {
-
-            setUserData(
-              snap.data()
-            );
-
-          } else {
-
-            // usersに無い時でも最低限表示
-            setUserData({
-              name:
-                user.displayName ||
-                "ユーザー",
-
-              username:
-                user.email?.split("@")[0] ||
-                "user",
-
-              admin: false,
-              verified: false
-            });
-
+            setUserData(snap.data());
           }
 
         }
-
       );
 
     return () => unsub();
 
   }, []);
 
-  // ログアウト
-  const logout =
-    async () => {
+  const logout = async () => {
+    await signOut(auth);
+    location.href="/login";
+  };
 
-      await signOut(auth);
+  const changePassword = async () => {
 
-      location.href =
-        "/login";
+    if(!newPassword)return;
 
-    };
+    try{
 
-  // パスワード変更
-  const changePassword =
-    async () => {
+      if(auth.currentUser){
 
-      if (!newPassword)
-        return;
-
-      try {
-
-        if (auth.currentUser) {
-
-          await updatePassword(
-            auth.currentUser,
-            newPassword
-          );
-
-          alert(
-            "変更しました"
-          );
-
-          setNewPassword("");
-
-        }
-
-      } catch {
-
-        alert(
-          "再ログインしてください"
+        await updatePassword(
+          auth.currentUser,
+          newPassword
         );
+
+        alert("変更しました");
+        setNewPassword("");
 
       }
 
-    };
+    }catch{
 
-  // 管理者権限
-  const becomeAdmin =
-    async () => {
+      alert("再ログインしてください");
 
-      if (
-        adminPassword !==
-        "annpannmann"
-      ) {
+    }
 
-        alert(
-          "パスワード違います"
-        );
+  };
 
-        return;
+  const becomeAdmin=async()=>{
 
+    if(adminPassword!=="annpannmann"){
+      alert("パスワードが違います");
+      return;
+    }
+
+    await updateDoc(
+      doc(db,"users",currentUser.uid),
+      {
+        admin:true,
+        verified:true
       }
+    );
 
-      try {
+    alert("管理者になりました");
+    location.reload();
 
-        await updateDoc(
-          doc(
-            db,
-            "users",
-            currentUser.uid
-          ),
-          {
-            admin: true,
-            verified: true
-          }
-        );
+  };
 
-        alert(
-          "管理者権限を付与しました"
-        );
+  const removeAccount=async()=>{
 
-        location.reload();
+    const ok=confirm(
+      "本当に削除しますか？"
+    );
 
-      } catch {
+    if(!ok)return;
 
-        alert(
-          "失敗しました"
-        );
+    await deleteUser(
+      auth.currentUser!
+    );
 
-      }
+  };
 
-    };
+  if(!currentUser)return null;
 
-  // アカウント削除
-  const removeAccount =
-    async () => {
+  return(
 
-      const ok =
-        confirm(
-          "本当に削除しますか？"
-        );
-
-      if (!ok)
-        return;
-
-      try {
-
-        if (auth.currentUser) {
-
-          await deleteUser(
-            auth.currentUser
-          );
-
-          location.href =
-            "/login";
-
-        }
-
-      } catch {
-
-        alert(
-          "再ログインしてください"
-        );
-
-      }
-
-    };
-
-  if (!currentUser)
-    return null;
-
-  return (
-
-    <Layout currentUser={{
-      ...currentUser,
-      ...userData
-    }}>
+    <Layout currentUser={{...currentUser,...userData}}>
 
       <div className="p-6 text-white">
 
         <h1 className="text-4xl font-bold mb-8">
-
           設定
-
         </h1>
 
-        {/* アカウント */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-6">
+        <div className="bg-zinc-900 rounded-2xl p-5 mb-6">
 
-          <div className="text-2xl font-bold mb-4">
-
+          <div className="text-xl font-bold mb-4">
             アカウント情報
-
           </div>
 
-          <div className="mb-3">
-
-            名前:
-            {" "}
-            {userData?.name}
-
+          <div>
+            名前: {userData?.name}
           </div>
 
-          <div className="mb-3 text-zinc-400">
-
-            @
-            {userData?.username}
-
+          <div className="text-zinc-500 mt-2">
+            @{userData?.username}
           </div>
 
         </div>
 
-        {/* パスワード変更 */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-6">
+        <div className="bg-zinc-900 rounded-2xl p-5 mb-6">
 
           <div className="text-xl font-bold mb-4">
-
             パスワード変更
-
           </div>
 
           <input
-            type="password"
-            placeholder="新しいパスワード"
-            value={newPassword}
-            onChange={(e)=>
-              setNewPassword(
-                e.target.value
-              )
-            }
-            className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-4"
+          type="password"
+          value={newPassword}
+          onChange={(e)=>setNewPassword(e.target.value)}
+          placeholder="新しいパスワード"
+          className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-4"
           />
 
           <button
-            onClick={changePassword}
-            className="bg-blue-500 hover:bg-blue-600 px-5 py-3 rounded-xl font-bold"
+          onClick={changePassword}
+          className="bg-blue-500 px-5 py-3 rounded-xl"
           >
-
             変更する
-
           </button>
 
         </div>
 
-        {/* 管理者 */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-6">
+        <div className="bg-zinc-900 rounded-2xl p-5 mb-6">
 
           <div className="text-xl font-bold mb-4">
-
             管理者権限付与
-
           </div>
 
           <input
-            type="password"
-            placeholder="管理者パスワード"
-            value={adminPassword}
-            onChange={(e)=>
-              setAdminPassword(
-                e.target.value
-              )
-            }
-            className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-4"
+          type="password"
+          value={adminPassword}
+          onChange={(e)=>setAdminPassword(e.target.value)}
+          placeholder="管理者パスワード"
+          className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-4"
           />
 
           <button
-            onClick={becomeAdmin}
-            className="bg-yellow-500 hover:bg-yellow-600 text-black px-5 py-3 rounded-xl font-bold"
+          onClick={becomeAdmin}
+          className="bg-yellow-500 text-black px-5 py-3 rounded-xl"
           >
-
             管理者になる
-
           </button>
 
         </div>
 
-        {/* ログアウト */}
         <button
-          onClick={logout}
-          className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl p-4 text-left mb-4"
+        onClick={logout}
+        className="w-full bg-zinc-800 rounded-xl p-4 mb-4"
         >
-
           ログアウト
-
         </button>
 
-        {/* 削除 */}
         <button
-          onClick={removeAccount}
-          className="w-full bg-red-600 hover:bg-red-700 rounded-2xl p-4 text-left"
+        onClick={removeAccount}
+        className="w-full bg-red-600 rounded-xl p-4 mb-4"
         >
-
           アカウント削除
-
         </button>
+
+        <Link
+        href="/terms"
+        className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left"
+        >
+          利用規約
+        </Link>
 
       </div>
 
     </Layout>
 
-  );
-
+  )
 }
