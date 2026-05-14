@@ -17,7 +17,7 @@ import {
 const firebaseConfig = {
 
   apiKey:
-    "AIzaSyC3v8B5z-WuhhC4sI8c1s6FUDk2NYX_WmY",
+    "AIzaS_WmY",
 
   authDomain:
     "critter-3c31b.firebaseapp.com",
@@ -36,16 +36,16 @@ const firebaseConfig = {
 
 };
 
-const app =
-  initializeApp(
-    firebaseConfig
-  );
+const app=
+initializeApp(
+firebaseConfig
+);
 
-export const auth =
-  getAuth(app);
+export const auth=
+getAuth(app);
 
-export const db =
-  getFirestore(app);
+export const db=
+getFirestore(app);
 
-export const storage =
-  getStorage(app);
+export const storage=
+getStorage(app);
