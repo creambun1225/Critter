@@ -260,7 +260,7 @@ export default function Layout({
 
       </div>
 
-{/* モバイル下メニュー */}
+{/* スマホ版メニュー */}
 <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around py-3 md:hidden z-50">
 
   <Link href="/">

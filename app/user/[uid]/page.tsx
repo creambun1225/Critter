@@ -4,183 +4,337 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Layout from "@/components/Layout";
+
 import { db, auth } from "@/lib/firebase";
+
 import {
   doc,
   getDoc,
   updateDoc,
-  collection,
-  query,
-  where,
-  onSnapshot,
   arrayUnion,
-  arrayRemove,
+  arrayRemove
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+
+import {
+  onAuthStateChanged
+} from "firebase/auth";
 
 export default function UserProfile() {
-  const params = useParams();
-  const uid = params.uid as string;
 
-  const [profile, setProfile] = useState<any>(null);
-  const [me, setMe] = useState<any>(null);
-  const [posts, setPosts] = useState<any[]>([]);
-  const [followers, setFollowers] = useState<string[]>([]);
-  const [following, setFollowing] = useState<string[]>([]);
+  const params =
+    useParams();
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) {
-        location.href = "/login";
-        return;
-      }
+  const uid =
+    params.uid as string;
 
-      setMe(u);
+  const [profile,setProfile] =
+    useState<any>(null);
 
-      const snap = await getDoc(doc(db, "users", uid));
+  const [me,setMe] =
+    useState<any>(null);
 
-      if (snap.exists()) {
-        const data = snap.data();
-        setProfile({ uid, ...data });
-        setFollowers(data.followers || []);
-      }
+  const [followers,setFollowers] =
+    useState<string[]>([]);
 
-      const mySnap = await getDoc(doc(db, "users", u.uid));
+  const [following,setFollowing] =
+    useState<string[]>([]);
 
-      if (mySnap.exists()) {
-        setFollowing(mySnap.data().following || []);
-      }
-    });
+  useEffect(()=>{
 
-    return () => unsub();
-  }, [uid]);
+    const unsub=
+      onAuthStateChanged(
+        auth,
+        async(user)=>{
 
-  useEffect(() => {
-    const q = query(
-      collection(db, "posts"),
-      where("uid", "==", uid)
-    );
+          if(!user){
 
-    const unsub = onSnapshot(q, (snap) => {
-      setPosts(
-        snap.docs.map((d: any) => ({
-          id: d.id,
-          ...d.data(),
-        }))
+            location.href=
+              "/login";
+
+            return;
+
+          }
+
+          setMe(user);
+
+          // 相手プロフィール
+          const profileSnap=
+            await getDoc(
+              doc(
+                db,
+                "users",
+                uid
+              )
+            );
+
+          if(
+            profileSnap.exists()
+          ){
+
+            const data=
+              profileSnap.data();
+
+            setProfile({
+
+              uid,
+
+              ...data
+
+            });
+
+            setFollowers(
+              data.followers || []
+            );
+
+          }
+
+          // 自分
+          const mySnap=
+            await getDoc(
+              doc(
+                db,
+                "users",
+                user.uid
+              )
+            );
+
+          if(
+            mySnap.exists()
+          ){
+
+            setFollowing(
+              mySnap.data()
+                .following || []
+            );
+
+          }
+
+        }
       );
-    });
 
-    return () => unsub();
-  }, [uid]);
+    return ()=>unsub();
 
-  const toggleFollow = async () => {
-    if (!me) return;
+  },[uid]);
 
-    const already = followers.includes(me.uid);
+  const toggleFollow=
+    async()=>{
 
-    const profileRef = doc(db, "users", uid);
-    const myRef = doc(db, "users", me.uid);
+      if(!me)return;
 
-    if (already) {
-      await updateDoc(profileRef, {
-        followers: arrayRemove(me.uid),
-      });
+      const already=
+        followers.includes(
+          me.uid
+        );
 
-      await updateDoc(myRef, {
-        following: arrayRemove(uid),
-      });
+      const profileRef=
+        doc(
+          db,
+          "users",
+          uid
+        );
 
-      setFollowers(followers.filter((id) => id !== me.uid));
-      setFollowing(following.filter((id) => id !== uid));
-    } else {
-      await updateDoc(profileRef, {
-        followers: arrayUnion(me.uid),
-      });
+      const myRef=
+        doc(
+          db,
+          "users",
+          me.uid
+        );
 
-      await updateDoc(myRef, {
-        following: arrayUnion(uid),
-      });
+      if(already){
 
-      setFollowers([...followers, me.uid]);
-      setFollowing([...following, uid]);
-    }
-  };
+        await updateDoc(
+          profileRef,
+          {
+            followers:
+              arrayRemove(
+                me.uid
+              )
+          }
+        );
 
-  if (!profile) return null;
+        await updateDoc(
+          myRef,
+          {
+            following:
+              arrayRemove(
+                uid
+              )
+          }
+        );
 
-  return (
-    <Layout currentUser={me}>
-      <div className="bg-black min-h-screen text-white">
+        setFollowers(
+          followers.filter(
+            (id)=>
+              id!==me.uid
+          )
+        );
 
-        <div className="relative">
-          <div className="h-40 bg-zinc-800" />
+        setFollowing(
+          following.filter(
+            (id)=>
+              id!==uid
+          )
+        );
 
-          <div className="absolute -bottom-16 left-6">
-            <div className="w-32 h-32 rounded-full border-4 border-black overflow-hidden bg-zinc-700">
-              <img
-                src={profile.icon || "/default.png"}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
-        </div>
+      }else{
 
-        <div className="pt-20 px-6">
-          <div className="flex justify-between items-center flex-wrap">
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold">
-                {profile.name}
-              </h1>
-            </div>
+        await updateDoc(
+          profileRef,
+          {
+            followers:
+              arrayUnion(
+                me.uid
+              )
+          }
+        );
 
-            {me?.uid !== uid && (
-              <button
-                onClick={toggleFollow}
-                className="bg-white text-black px-5 py-2 rounded-full font-bold"
-              >
-                {followers.includes(me.uid)
-                  ? "フォロー中"
-                  : "フォロー"}
-              </button>
-            )}
-          </div>
+        await updateDoc(
+          myRef,
+          {
+            following:
+              arrayUnion(
+                uid
+              )
+          }
+        );
 
-          <div className="text-zinc-400 mt-2">
-            @{profile.username}
-          </div>
+        setFollowers([
+          ...followers,
+          me.uid
+        ]);
 
-          <div className="mt-4">
-            {profile.bio}
-          </div>
+        setFollowing([
+          ...following,
+          uid
+        ]);
 
-          <div className="flex gap-6 mt-5 text-zinc-400">
-            <div>
-              <span className="text-white font-bold">
-                {following.length}
-              </span>
-              フォロー中
-            </div>
+      }
 
-            <div>
-              <span className="text-white font-bold">
-                {followers.length}
-              </span>
-              フォロワー
-            </div>
-          </div>
+    };
 
-          {me?.uid === uid && (
-            <div className="mt-6">
-              <Link
-                href="/profile/edit"
-                className="px-4 py-2 rounded-full border border-zinc-700 hover:bg-zinc-900"
-              >
-                プロフィール編集
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-    </Layout>
-  );
+  if(!profile)
+    return null;
+
+  return(
+
+<Layout currentUser={me}>
+
+<div className="bg-black min-h-screen text-white">
+
+<div className="h-40 bg-zinc-800"/>
+
+<div className="-mt-16 px-6">
+
+<img
+src={
+profile.icon ||
+"/default.png"
+}
+className="w-32 h-32 rounded-full border-4 border-black object-cover"
+/>
+
+<div className="flex justify-between mt-5">
+
+<div>
+
+<h1 className="text-3xl font-bold">
+
+{profile.name}
+
+</h1>
+
+<div className="text-zinc-500">
+
+@{profile.username}
+
+</div>
+
+</div>
+
+{me?.uid!==uid&&(
+
+<button
+onClick={toggleFollow}
+className="bg-white text-black px-5 py-2 rounded-full font-bold"
+>
+
+{followers.includes(
+me.uid
+)
+?
+"フォロー中"
+:
+"フォロー"}
+
+</button>
+
+)}
+
+</div>
+
+<p className="mt-5">
+
+{profile.bio}
+
+</p>
+
+<div className="flex gap-8 mt-5">
+
+<div>
+
+<span className="font-bold">
+
+{
+(profile.following || [])
+.length
+}
+
+</span>
+
+フォロー中
+
+</div>
+
+<div>
+
+<span className="font-bold">
+
+{
+followers.length
+}
+
+</span>
+
+フォロワー
+
+</div>
+
+</div>
+
+{me?.uid===uid&&(
+
+<Link
+href="/profile/edit"
+>
+
+<button
+className="mt-5 border border-zinc-700 px-5 py-2 rounded-full"
+>
+
+プロフィール編集
+
+</button>
+
+</Link>
+
+)}
+
+</div>
+
+</div>
+
+</Layout>
+
+);
+
 }
