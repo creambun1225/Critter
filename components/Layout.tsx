@@ -6,6 +6,22 @@ import {
   usePathname
 } from "next/navigation";
 
+import {
+  useEffect,
+  useState
+} from "react";
+
+import {
+  db
+} from "@/lib/firebase";
+
+import {
+  collection,
+  query,
+  where,
+  onSnapshot
+} from "firebase/firestore";
+
 export default function Layout({
   children,
   currentUser
@@ -16,6 +32,64 @@ export default function Layout({
 
   const pathname =
     usePathname();
+
+  const [notificationCount,
+    setNotificationCount] =
+    useState(0);
+
+  useEffect(() => {
+
+    if (
+      !currentUser?.uid ||
+      !currentUser?.admin
+    ) return;
+
+    const q = query(
+      collection(
+        db,
+        "notifications"
+      ),
+      where(
+        "type",
+        "==",
+        "report"
+      )
+    );
+
+    const unsub =
+      onSnapshot(q, (snap)=>{
+
+        let unread = 0;
+
+        snap.docs.forEach((d:any)=>{
+
+          const data =
+            d.data();
+
+          const readBy =
+            data.readBy || [];
+
+          if (
+            !readBy.includes(
+              currentUser.uid
+            )
+          ) {
+
+            unread++;
+
+          }
+
+        });
+
+        setNotificationCount(
+          unread
+        );
+
+      });
+
+    return ()=>unsub();
+
+  }, [currentUser]);
 
   const menus = [
 
@@ -70,12 +144,12 @@ export default function Layout({
           {/* ロゴ */}
           <Link
             href="/"
-            className="mb-4"
+            className="w-14 h-14 rounded-full hover:bg-zinc-900 flex items-center justify-center mb-4 overflow-hidden"
           >
 
             <img
               src="/logo.png"
-              className="w-14 h-14 rounded-2xl object-cover hover:opacity-80 transition"
+              className="w-full h-full object-cover"
             />
 
           </Link>
@@ -83,7 +157,7 @@ export default function Layout({
           {/* メニュー */}
           <div className="flex flex-col gap-1">
 
-            {menus.map((menu) => (
+            {menus.map((menu)=>(
 
               <Link
                 key={menu.href}
@@ -97,18 +171,36 @@ export default function Layout({
                   transition
                   hover:bg-zinc-900
 
-                  ${pathname === menu.href
+                  ${
+                    pathname === menu.href
                     ? "bg-zinc-900"
                     : ""
                   }
                 `}
               >
 
-                <span className="text-3xl">
+                <div className="relative">
 
-                  {menu.icon}
+                  <span className="text-3xl">
 
-                </span>
+                    {menu.icon}
+
+                  </span>
+
+                  {/* 通知バッジ */}
+                  {menu.href ===
+                    "/notifications" &&
+                    notificationCount > 0 && (
+
+                    <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs min-w-[20px] h-5 px-1 rounded-full flex items-center justify-center font-bold">
+
+                      {notificationCount}
+
+                    </div>
+
+                  )}
+
+                </div>
 
                 <span>
 
@@ -139,7 +231,6 @@ export default function Layout({
 
               <img
                 src={
-                  currentUser?.photoURL ||
                   currentUser?.icon ||
                   "/default.png"
                 }
@@ -150,8 +241,7 @@ export default function Layout({
 
                 <div className="font-bold truncate">
 
-                  {currentUser?.displayName ||
-                    currentUser?.name ||
+                  {currentUser?.name ||
                     "ユーザー"}
 
                 </div>
@@ -160,7 +250,7 @@ export default function Layout({
 
                   @{
                     currentUser?.username ||
-                    currentUser?.email?.split("@")[0]
+                    "user"
                   }
 
                 </div>
@@ -250,7 +340,7 @@ export default function Layout({
 
             <div className="text-zinc-500 text-sm mt-4 px-2">
 
-              Critter v1.0.2
+              Critter v1.0.1
 
             </div>
 
@@ -260,36 +350,54 @@ export default function Layout({
 
       </div>
 
-{/* スマホ版メニュー */}
-<div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around py-3 md:hidden z-50">
+      {/* モバイル */}
+      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around py-3 md:hidden z-50">
 
-  <Link href="/">
-    🏠
-  </Link>
+        <Link href="/">
+          🏠
+        </Link>
 
-  <Link href="/search">
-    🔎
-  </Link>
+        <Link href="/search">
+          🔎
+        </Link>
 
-  <Link href="/notifications">
-    🔔
-  </Link>
+        <Link
+          href="/notifications"
+          className="relative"
+        >
 
-  <Link href="/bookmarks">
-    🔖
-  </Link>
+          🔔
 
-  <Link href={`/user/${currentUser?.uid}`}>
-    👤
-  </Link>
+          {notificationCount > 0 && (
 
-  <Link href="/settings">
-    ⚙️
-  </Link>
+            <div className="absolute -top-2 -right-3 bg-blue-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center font-bold">
 
-</div>
+              {notificationCount}
 
-</div>
+            </div>
 
-);
+          )}
+
+        </Link>
+
+        <Link href="/bookmarks">
+          🔖
+        </Link>
+
+        <Link
+          href={`/user/${currentUser?.uid}`}
+        >
+          👤
+        </Link>
+
+        <Link href="/settings">
+          ⚙️
+        </Link>
+
+      </div>
+
+    </div>
+
+  );
+
 }

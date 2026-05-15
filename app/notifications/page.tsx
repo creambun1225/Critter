@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useState
-} from "react";
+import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
@@ -21,28 +18,30 @@ import {
 import {
   collection,
   query,
+  where,
   orderBy,
   onSnapshot,
   doc,
-  getDoc
+  getDoc,
+  updateDoc
 } from "firebase/firestore";
 
 export default function NotificationsPage() {
 
-  const [currentUser,setCurrentUser] =
+  const [currentUser, setCurrentUser] =
     useState<any>(null);
 
-  const [notifications,setNotifications] =
+  const [notifications, setNotifications] =
     useState<any[]>([]);
 
-  useEffect(()=>{
+  useEffect(() => {
 
     const unsub =
       onAuthStateChanged(
         auth,
-        async(user)=>{
+        async (user) => {
 
-          if(!user){
+          if (!user) {
 
             location.href =
               "/login";
@@ -51,7 +50,7 @@ export default function NotificationsPage() {
 
           }
 
-          const snap =
+          const userSnap =
             await getDoc(
               doc(
                 db,
@@ -60,140 +59,153 @@ export default function NotificationsPage() {
               )
             );
 
-          if(
-            snap.exists()
-          ){
+          if (!userSnap.exists())
+            return;
 
-            const data =
-              snap.data();
+          const userData =
+            userSnap.data();
 
-            setCurrentUser({
+          setCurrentUser({
+            uid: user.uid,
+            ...userData
+          });
 
-              uid:user.uid,
+          // 管理者なら通報通知取得
+          if (userData.admin) {
 
-              ...data
+            const q = query(
+              collection(
+                db,
+                "notifications"
+              ),
+              where(
+                "type",
+                "==",
+                "report"
+              ),
+              orderBy(
+                "createdAt",
+                "desc"
+              )
+            );
 
-            });
+            onSnapshot(
+              q,
+              async (snap) => {
+
+                const list =
+                  snap.docs.map(
+                    (d:any)=>({
+                      id:d.id,
+                      ...d.data()
+                    })
+                  );
+
+                setNotifications(
+                  list
+                );
+
+                // 未読を既読に
+                for (const n of list) {
+
+                  if (
+                    !n.readBy?.includes(
+                      user.uid
+                    )
+                  ) {
+
+                    await updateDoc(
+                      doc(
+                        db,
+                        "notifications",
+                        n.id
+                      ),
+                      {
+                        readBy: [
+                          ...(n.readBy || []),
+                          user.uid
+                        ]
+                      }
+                    );
+
+                  }
+
+                }
+
+              }
+            );
 
           }
 
         }
       );
 
-    return ()=>unsub();
+    return () => unsub();
 
-  },[]);
+  }, []);
 
-  useEffect(()=>{
+  return (
 
-    if(
-      !currentUser?.admin
-    ) return;
+    <Layout currentUser={currentUser}>
 
-    const q =
-      query(
-        collection(
-          db,
-          "notifications"
-        ),
-        orderBy(
-          "createdAt",
-          "desc"
-        )
-      );
+      <div className="bg-black min-h-screen text-white">
 
-    const unsub =
-      onSnapshot(
-        q,
-        (snap)=>{
+        {/* タイトル */}
+        <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
 
-          setNotifications(
+          <div className="text-3xl font-bold">
 
-            snap.docs.map(
-              (d:any)=>({
+            通知
 
-                id:d.id,
+          </div>
 
-                ...d.data()
+        </div>
 
-              })
-            )
+        {/* 通知一覧 */}
+        <div>
 
-          );
+          {notifications.length === 0 && (
 
-        }
-      );
+            <div className="p-6 text-zinc-500">
 
-    return ()=>unsub();
+              通知はありません
 
-  },[currentUser]);
+            </div>
 
-  return(
+          )}
 
-<Layout currentUser={currentUser}>
+          {notifications.map((n:any)=>(
 
-<div className="text-white">
+            <div
+              key={n.id}
+              className="border-b border-zinc-800 p-5 hover:bg-zinc-950 transition"
+            >
 
-<div className="sticky top-0 bg-black/90 backdrop-blur border-b border-zinc-800 p-4 z-50">
+              <div className="text-lg">
 
-<div className="text-3xl font-bold">
+                🚨 クリートが通報されました
 
-通知
+              </div>
 
-</div>
+              <Link
+                href={`/post/${n.postId}`}
+                className="text-blue-400 mt-3 inline-block"
+              >
 
-</div>
+                [通報されたクリートを表示]
 
-{!currentUser?.admin ? (
+              </Link>
 
-<div className="p-6 text-zinc-500">
+            </div>
 
-管理者通知はありません
+          ))}
 
-</div>
+        </div>
 
-) : (
+      </div>
 
-<div>
+    </Layout>
 
-{notifications.map((n:any)=>(
-
-<div
-key={n.id}
-className="border-b border-zinc-800 p-5"
->
-
-<div className="font-bold text-lg">
-
-{n.message}
-
-</div>
-
-{n.type==="report" && (
-
-<Link
-href={`/post/${n.postId}`}
-className="text-blue-500 mt-3 inline-block"
->
-
-通報されたクリートを表示
-
-</Link>
-
-)}
-
-</div>
-
-))}
-
-</div>
-
-)}
-
-</div>
-
-</Layout>
-
-);
+  );
 
 }
