@@ -28,14 +28,61 @@ export default function PostCard({
   const reportPost =
     async () => {
 
+      if (!currentUser)
+        return;
+
+      // 管理者通知追加
+      await addDoc(
+        collection(
+          db,
+          "notifications"
+        ),
+        {
+
+          type:
+            "report",
+
+          message:
+            "クリートが通報されました",
+
+          postId:
+            post.id,
+
+          postText:
+            post.text ||
+
+            "",
+
+          postImage:
+            post.image ||
+
+            "",
+
+          reportedBy:
+            currentUser.uid,
+
+          targetUid:
+            post.uid,
+
+          createdAt:
+            Date.now()
+
+        }
+      );
+
+      // 通報履歴
       await addDoc(
         collection(
           db,
           "reports"
         ),
         {
-          postId: post.id,
-          text: post.text,
+          postId:
+            post.id,
+
+          text:
+            post.text,
+
           createdAt:
             Date.now()
         }
@@ -104,11 +151,13 @@ export default function PostCard({
           post.id
         ),
         {
+
           likedUsers:
             newLikedUsers,
 
           likes:
             newLikedUsers.length
+
         }
       );
 
@@ -155,11 +204,13 @@ export default function PostCard({
           post.id
         ),
         {
+
           repostedUsers:
             newRepostedUsers,
 
           reposts:
             newRepostedUsers.length
+
         }
       );
 
@@ -206,11 +257,13 @@ export default function PostCard({
           post.id
         ),
         {
+
           bookmarkedUsers:
             newBookmarkedUsers,
 
           bookmarks:
             newBookmarkedUsers.length
+
         }
       );
 
@@ -219,6 +272,7 @@ export default function PostCard({
   const canDelete =
     currentUser?.uid ===
       post.uid ||
+
     currentUser?.admin;
 
   return (

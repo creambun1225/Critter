@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState
+} from "react";
+
+import Link from "next/link";
 
 import Layout from "@/components/Layout";
 
@@ -17,42 +22,73 @@ import {
   collection,
   query,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  doc,
+  getDoc
 } from "firebase/firestore";
 
 export default function NotificationsPage() {
 
-  const [currentUser, setCurrentUser] =
+  const [currentUser,setCurrentUser] =
     useState<any>(null);
 
-  const [notifications, setNotifications] =
+  const [notifications,setNotifications] =
     useState<any[]>([]);
 
-  // ログイン確認
-  useEffect(() => {
+  useEffect(()=>{
 
-    return onAuthStateChanged(
-      auth,
-      (user) => {
+    const unsub =
+      onAuthStateChanged(
+        auth,
+        async(user)=>{
 
-        if (!user) {
+          if(!user){
 
-          location.href =
-            "/login";
+            location.href =
+              "/login";
 
-          return;
+            return;
+
+          }
+
+          const snap =
+            await getDoc(
+              doc(
+                db,
+                "users",
+                user.uid
+              )
+            );
+
+          if(
+            snap.exists()
+          ){
+
+            const data =
+              snap.data();
+
+            setCurrentUser({
+
+              uid:user.uid,
+
+              ...data
+
+            });
+
+          }
 
         }
+      );
 
-        setCurrentUser(user);
+    return ()=>unsub();
 
-      }
-    );
+  },[]);
 
-  }, []);
+  useEffect(()=>{
 
-  // 通知取得
-  useEffect(() => {
+    if(
+      !currentUser?.admin
+    ) return;
 
     const q =
       query(
@@ -69,148 +105,95 @@ export default function NotificationsPage() {
     const unsub =
       onSnapshot(
         q,
-        (snap) => {
+        (snap)=>{
 
           setNotifications(
 
-            snap.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data()
-            }))
+            snap.docs.map(
+              (d:any)=>({
+
+                id:d.id,
+
+                ...d.data()
+
+              })
+            )
 
           );
 
         }
       );
 
-    return () => unsub();
+    return ()=>unsub();
 
-  }, []);
+  },[currentUser]);
 
-  return (
+  return(
 
-    <Layout currentUser={currentUser}>
+<Layout currentUser={currentUser}>
 
-      {/* タイトル */}
-      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
+<div className="text-white">
 
-        <div className="text-4xl font-bold">
+<div className="sticky top-0 bg-black/90 backdrop-blur border-b border-zinc-800 p-4 z-50">
 
-          通知
+<div className="text-3xl font-bold">
 
-        </div>
+通知
 
-      </div>
+</div>
 
-      {/* 通知一覧 */}
-      <div>
+</div>
 
-        {notifications.length === 0 && (
+{!currentUser?.admin ? (
 
-          <div className="p-8 text-zinc-500 text-center">
+<div className="p-6 text-zinc-500">
 
-            通知はまだありません
+管理者通知はありません
 
-          </div>
+</div>
 
-        )}
+) : (
 
-        {notifications.map((n:any) => (
+<div>
 
-          <div
-            key={n.id}
-            className="border-b border-zinc-800 p-5 hover:bg-zinc-950 transition"
-          >
+{notifications.map((n:any)=>(
 
-            {/* 通報 */}
-            {n.type === "report" && (
+<div
+key={n.id}
+className="border-b border-zinc-800 p-5"
+>
 
-              <div>
+<div className="font-bold text-lg">
 
-                <div className="text-red-400 font-bold text-lg">
+{n.message}
 
-                  🚨 通報
+</div>
 
-                </div>
+{n.type==="report" && (
 
-                <div className="mt-2 text-white">
+<Link
+href={`/post/${n.postId}`}
+className="text-blue-500 mt-3 inline-block"
+>
 
-                  {n.text}
+通報されたクリートを表示
 
-                </div>
+</Link>
 
-              </div>
+)}
 
-            )}
+</div>
 
-            {/* いいね */}
-            {n.type === "like" && (
+))}
 
-              <div>
+</div>
 
-                <div className="text-pink-400 font-bold text-lg">
+)}
 
-                  ❤️ いいね
+</div>
 
-                </div>
+</Layout>
 
-                <div className="mt-2">
-
-                  あなたのクリートがいいねされました
-                </div>
-
-              </div>
-
-            )}
-
-            {/* リポスト */}
-            {n.type === "repost" && (
-
-              <div>
-
-                <div className="text-green-400 font-bold text-lg">
-
-                  🔁 リポスト
-
-                </div>
-
-                <div className="mt-2">
-
-                  あなたのクリートがリポストされました
-                </div>
-
-              </div>
-
-            )}
-
-            {/* フォロー */}
-            {n.type === "follow" && (
-
-              <div>
-
-                <div className="text-sky-400 font-bold text-lg">
-
-                  👤 フォロー
-
-                </div>
-
-                <div className="mt-2">
-
-                  新しいフォロワーがいます
-                </div>
-
-              </div>
-
-            )}
-
-          </div>
-
-        ))}
-
-      </div>
-
-    </Layout>
-
-  );
+);
 
 }
