@@ -340,7 +340,7 @@ export default function Layout({
 
             <div className="text-zinc-500 text-sm mt-4 px-2">
 
-              Critter v1.0.2
+              Critter v1.0.3
 
             </div>
 
