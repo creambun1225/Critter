@@ -205,7 +205,6 @@ function QuoteModal({
       <div className="fixed inset-0 z-40 bg-black/70" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
         <div className="w-full max-w-lg bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
             <button
               onClick={onClose}
@@ -269,7 +268,15 @@ function QuoteModal({
 // ───────────────────────────────────────
 // メイン PostCard
 // ───────────────────────────────────────
-export default function PostCard({ post, currentUser }: any) {
+export default function PostCard({
+  post,
+  currentUser,
+  onAnalytics,
+}: {
+  post: any;
+  currentUser: any;
+  onAnalytics?: (post: any) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [showRepostModal, setShowRepostModal] = useState(false);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -277,6 +284,8 @@ export default function PostCard({ post, currentUser }: any) {
   const isLiked = post.likedUsers?.includes(currentUser?.uid);
   const isReposted = post.repostedUsers?.includes(currentUser?.uid);
   const isBookmarked = post.bookmarkedUsers?.includes(currentUser?.uid);
+  const isOwner = currentUser?.uid === post.uid;
+  const canDelete = isOwner || currentUser?.admin;
 
   // 通報
   const reportPost = async () => {
@@ -347,8 +356,6 @@ export default function PostCard({ post, currentUser }: any) {
     });
   };
 
-  const canDelete = currentUser?.uid === post.uid || currentUser?.admin;
-
   return (
     <div className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">
       <div className="flex justify-between items-start gap-3">
@@ -356,8 +363,12 @@ export default function PostCard({ post, currentUser }: any) {
         {/* 左 */}
         <div className="flex gap-3 flex-1 min-w-0">
 
-          {/* アイコン → プロフィールへ */}
-          <Link href={`/user/${post.uid}`} onClick={(e) => e.stopPropagation()} className="shrink-0">
+          {/* アイコン */}
+          <Link
+            href={`/user/${post.uid}`}
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0"
+          >
             <img
               src={post.icon || "/default.png"}
               className="w-12 h-12 rounded-full object-cover bg-zinc-700"
@@ -366,7 +377,7 @@ export default function PostCard({ post, currentUser }: any) {
 
           <div className="flex-1 min-w-0">
 
-            {/* 名前・バッジ・ID・時間 */}
+            {/* 名前・バッジ */}
             <div className="flex items-center gap-2 flex-wrap">
               <Link
                 href={`/user/${post.uid}`}
@@ -391,7 +402,7 @@ export default function PostCard({ post, currentUser }: any) {
               </div>
             )}
 
-            {/* 本文 → 詳細ページへ */}
+            {/* 本文 → 詳細ページ */}
             <Link
               href={`/post/${post.id}`}
               className="block mt-2 whitespace-pre-wrap break-words text-[16px] text-white hover:opacity-90 transition"
@@ -399,7 +410,7 @@ export default function PostCard({ post, currentUser }: any) {
               {post.text}
             </Link>
 
-            {/* 画像 → 詳細ページへ */}
+            {/* 画像 → 詳細ページ */}
             {post.image && (
               <Link href={`/post/${post.id}`}>
                 <img
@@ -426,7 +437,7 @@ export default function PostCard({ post, currentUser }: any) {
             {/* アクションボタン */}
             <div className="flex justify-between mt-5 max-w-md text-zinc-500">
 
-              {/* 💬 リプライ → 詳細ページへ */}
+              {/* 💬 リプライ */}
               <Link
                 href={`/post/${post.id}`}
                 className="hover:text-sky-400 flex items-center gap-2 transition"
@@ -449,7 +460,6 @@ export default function PostCard({ post, currentUser }: any) {
                   <span>🔁</span>
                   <span>{post.reposts || 0}</span>
                 </button>
-
                 {showRepostModal && (
                   <RepostModal
                     isReposted={isReposted}
@@ -503,12 +513,33 @@ export default function PostCard({ post, currentUser }: any) {
 
           {open && (
             <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-56 z-50 shadow-2xl">
+
+              {/* アナリティクス（投稿者本人 or 管理者のみ） */}
+              {(isOwner || currentUser?.admin) && onAnalytics && (
+                <>
+                  <button
+                    onClick={() => {
+                      onAnalytics(post);
+                      setOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-white flex items-center gap-2"
+                  >
+                    <span>📊</span>
+                    <span>アナリティクス</span>
+                  </button>
+                  <div className="border-t border-zinc-800" />
+                </>
+              )}
+
+              {/* 通報 */}
               <button
                 onClick={reportPost}
                 className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-400"
               >
                 このクリートを通報
               </button>
+
+              {/* 削除 */}
               {canDelete && (
                 <button
                   onClick={deletePost}
