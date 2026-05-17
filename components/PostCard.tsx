@@ -9,13 +9,12 @@ import {
   addDoc,
   collection,
   updateDoc,
-  serverTimestamp,
   increment,
   arrayUnion,
 } from "firebase/firestore";
 
 // ───────────────────────────────────────
-// 引用元カード（PostCard内に直接定義）
+// 引用元カード
 // ───────────────────────────────────────
 function QuotePostCard({ post }: { post: any }) {
   if (!post) {
@@ -32,41 +31,36 @@ function QuotePostCard({ post }: { post: any }) {
       : new Date(post.createdAt ?? Date.now());
 
   return (
-    <div className="border border-zinc-700 rounded-xl p-3 mt-3 hover:bg-zinc-900 transition cursor-pointer">
-      {/* ヘッダー */}
+    <Link
+      href={`/post/${post.id}`}
+      onClick={(e) => e.stopPropagation()}
+      className="block border border-zinc-700 rounded-xl p-3 mt-3 hover:bg-zinc-900 transition"
+    >
       <div className="flex items-center gap-2 flex-wrap mb-1">
         <img
           src={post.icon || "/default.png"}
           className="w-5 h-5 rounded-full object-cover bg-zinc-700"
         />
         <span className="font-bold text-white text-sm">{post.name}</span>
-        {post.verified && (
-          <img src="/verified-blue.png" className="w-4 h-4" />
-        )}
-        {post.admin && (
-          <img src="/verified-gold.png" className="w-4 h-4" />
-        )}
+        {post.verified && <img src="/verified-blue.png" className="w-4 h-4" />}
+        {post.admin && <img src="/verified-gold.png" className="w-4 h-4" />}
         <span className="text-zinc-500 text-sm">@{post.username}</span>
         <span className="text-zinc-600 text-xs ml-auto">
           {createdAt.toLocaleString("ja-JP")}
         </span>
       </div>
-
-      {/* テキスト */}
       {post.text && (
         <p className="text-sm text-white whitespace-pre-wrap break-words line-clamp-3">
           {post.text}
         </p>
       )}
-
-      {/* 画像 */}
       {post.image && (
         <img
           src={post.image}
           className="mt-2 rounded-lg max-h-40 object-cover border border-zinc-800 w-full"
         />
       )}
-    </div>
+    </Link>
   );
 }
 
@@ -88,7 +82,6 @@ function RepostModal({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-64 z-50 shadow-2xl">
-        {/* リポスト */}
         <button
           onClick={() => { onRepost(); onClose(); }}
           className="w-full text-left px-4 py-3 hover:bg-zinc-900 flex items-center gap-3"
@@ -106,7 +99,6 @@ function RepostModal({
 
         <div className="border-t border-zinc-800" />
 
-        {/* 引用リポスト */}
         <button
           onClick={() => { onQuote(); onClose(); }}
           className="w-full text-left px-4 py-3 hover:bg-zinc-900 flex items-center gap-3"
@@ -120,7 +112,6 @@ function RepostModal({
 
         <div className="border-t border-zinc-800" />
 
-        {/* キャンセル */}
         <button
           onClick={onClose}
           className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-zinc-400 text-sm"
@@ -153,15 +144,12 @@ function QuoteModal({
   const handleSubmit = async () => {
     if (!currentUser || !canSubmit) return;
     setLoading(true);
-
     try {
-      // ハッシュタグ抽出
       const hashtags =
         text.match(/#[\w\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+/g)?.map(
           (t) => t.slice(1)
         ) ?? [];
 
-      // 引用元スナップショット（削除後も表示できるよう埋め込む）
       const quoteSnap = {
         id: targetPost.id,
         text: targetPost.text ?? "",
@@ -175,7 +163,6 @@ function QuoteModal({
         createdAt: targetPost.createdAt ?? null,
       };
 
-      // 新規投稿として保存
       await addDoc(collection(db, "posts"), {
         text: text.trim(),
         image: null,
@@ -199,7 +186,6 @@ function QuoteModal({
         createdAt: Date.now(),
       });
 
-      // 引用元のリポスト数をインクリメント
       await updateDoc(doc(db, "posts", targetPost.id), {
         reposts: increment(1),
         repostedUsers: arrayUnion(currentUser.uid),
@@ -216,17 +202,10 @@ function QuoteModal({
 
   return (
     <>
-      {/* オーバーレイ */}
-      <div
-        className="fixed inset-0 z-40 bg-black/70"
-        onClick={onClose}
-      />
-
-      {/* モーダル本体 */}
+      <div className="fixed inset-0 z-40 bg-black/70" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
         <div className="w-full max-w-lg bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
 
-          {/* ヘッダー */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
             <button
               onClick={onClose}
@@ -244,32 +223,18 @@ function QuoteModal({
             </button>
           </div>
 
-          {/* 入力エリア */}
           <div className="flex gap-3 p-4 overflow-y-auto">
-            {/* アイコン */}
             <img
               src={currentUser?.icon || "/default.png"}
               className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0"
             />
-
             <div className="flex-1 min-w-0">
-              {/* ユーザー名 */}
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-bold text-white text-sm">
-                  {currentUser?.name}
-                </span>
-                {currentUser?.verified && (
-                  <img src="/verified-blue.png" className="w-4 h-4" />
-                )}
-                {currentUser?.admin && (
-                  <img src="/verified-gold.png" className="w-4 h-4" />
-                )}
-                <span className="text-zinc-500 text-sm">
-                  @{currentUser?.username}
-                </span>
+                <span className="font-bold text-white text-sm">{currentUser?.name}</span>
+                {currentUser?.verified && <img src="/verified-blue.png" className="w-4 h-4" />}
+                {currentUser?.admin && <img src="/verified-gold.png" className="w-4 h-4" />}
+                <span className="text-zinc-500 text-sm">@{currentUser?.username}</span>
               </div>
-
-              {/* テキスト入力 */}
               <textarea
                 autoFocus
                 value={text}
@@ -278,13 +243,10 @@ function QuoteModal({
                 rows={4}
                 className="w-full bg-transparent text-white placeholder-zinc-600 resize-none outline-none text-base leading-relaxed"
               />
-
-              {/* 引用元カード */}
               <QuotePostCard post={targetPost} />
             </div>
           </div>
 
-          {/* フッター（文字数） */}
           <div className="flex items-center justify-end px-4 py-3 border-t border-zinc-800 shrink-0">
             <span
               className={`text-sm font-medium ${
@@ -319,7 +281,6 @@ export default function PostCard({ post, currentUser }: any) {
   // 通報
   const reportPost = async () => {
     if (!currentUser) return;
-
     await addDoc(collection(db, "notifications"), {
       type: "report",
       message: "クリートが通報されました",
@@ -330,13 +291,11 @@ export default function PostCard({ post, currentUser }: any) {
       targetUid: post.uid,
       createdAt: Date.now(),
     });
-
     await addDoc(collection(db, "reports"), {
       postId: post.id,
       text: post.text,
       createdAt: Date.now(),
     });
-
     alert("通報しました");
     setOpen(false);
   };
@@ -354,7 +313,6 @@ export default function PostCard({ post, currentUser }: any) {
     const newLikedUsers = alreadyLiked
       ? likedUsers.filter((id: string) => id !== currentUser.uid)
       : [...likedUsers, currentUser.uid];
-
     await updateDoc(doc(db, "posts", post.id), {
       likedUsers: newLikedUsers,
       likes: newLikedUsers.length,
@@ -369,7 +327,6 @@ export default function PostCard({ post, currentUser }: any) {
     const newRepostedUsers = alreadyReposted
       ? repostedUsers.filter((id: string) => id !== currentUser.uid)
       : [...repostedUsers, currentUser.uid];
-
     await updateDoc(doc(db, "posts", post.id), {
       repostedUsers: newRepostedUsers,
       reposts: newRepostedUsers.length,
@@ -384,52 +341,49 @@ export default function PostCard({ post, currentUser }: any) {
     const newBookmarkedUsers = alreadyBookmarked
       ? bookmarkedUsers.filter((id: string) => id !== currentUser.uid)
       : [...bookmarkedUsers, currentUser.uid];
-
     await updateDoc(doc(db, "posts", post.id), {
       bookmarkedUsers: newBookmarkedUsers,
       bookmarks: newBookmarkedUsers.length,
     });
   };
 
-  const canDelete =
-    currentUser?.uid === post.uid || currentUser?.admin;
+  const canDelete = currentUser?.uid === post.uid || currentUser?.admin;
 
   return (
     <div className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">
-
-      {/* 上 */}
       <div className="flex justify-between items-start gap-3">
 
-        {/* 左（プロフィールリンク） */}
-        <Link href={`/user/${post.uid}`} className="flex gap-3 flex-1">
+        {/* 左 */}
+        <div className="flex gap-3 flex-1 min-w-0">
 
-          {/* アイコン */}
-          <img
-            src={post.icon || "/default.png"}
-            className="w-12 h-12 rounded-full object-cover shrink-0 bg-zinc-700"
-          />
+          {/* アイコン → プロフィールへ */}
+          <Link href={`/user/${post.uid}`} onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <img
+              src={post.icon || "/default.png"}
+              className="w-12 h-12 rounded-full object-cover bg-zinc-700"
+            />
+          </Link>
 
-          {/* 本体 */}
           <div className="flex-1 min-w-0">
 
             {/* 名前・バッジ・ID・時間 */}
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="font-bold text-white text-[17px]">{post.name}</div>
-
-              {post.verified && (
-                <img src="/verified-blue.png" className="w-5 h-5" />
-              )}
-              {post.admin && (
-                <img src="/verified-gold.png" className="w-5 h-5" />
-              )}
-
-              <div className="text-zinc-500">@{post.username}</div>
-              <div className="text-zinc-500 text-sm">
+              <Link
+                href={`/user/${post.uid}`}
+                onClick={(e) => e.stopPropagation()}
+                className="font-bold text-white text-[17px] hover:underline"
+              >
+                {post.name}
+              </Link>
+              {post.verified && <img src="/verified-blue.png" className="w-5 h-5" />}
+              {post.admin && <img src="/verified-gold.png" className="w-5 h-5" />}
+              <span className="text-zinc-500">@{post.username}</span>
+              <span className="text-zinc-500 text-sm">
                 · {new Date(post.createdAt).toLocaleString("ja-JP")}
-              </div>
+              </span>
             </div>
 
-            {/* 引用リポストラベル */}
+            {/* 引用ラベル */}
             {post.isQuoteRepost && (
               <div className="text-zinc-500 text-xs mt-1 flex items-center gap-1">
                 <span>🔁</span>
@@ -437,17 +391,22 @@ export default function PostCard({ post, currentUser }: any) {
               </div>
             )}
 
-            {/* 本文 */}
-            <div className="mt-2 whitespace-pre-wrap break-words text-[16px]">
+            {/* 本文 → 詳細ページへ */}
+            <Link
+              href={`/post/${post.id}`}
+              className="block mt-2 whitespace-pre-wrap break-words text-[16px] text-white hover:opacity-90 transition"
+            >
               {post.text}
-            </div>
+            </Link>
 
-            {/* 通常画像 */}
+            {/* 画像 → 詳細ページへ */}
             {post.image && (
-              <img
-                src={post.image}
-                className="mt-4 rounded-2xl max-h-[500px] object-cover border border-zinc-800"
-              />
+              <Link href={`/post/${post.id}`}>
+                <img
+                  src={post.image}
+                  className="mt-4 rounded-2xl max-h-[500px] object-cover border border-zinc-800 w-full"
+                />
+              </Link>
             )}
 
             {/* 引用元カード */}
@@ -459,9 +418,7 @@ export default function PostCard({ post, currentUser }: any) {
             {post.hashtags?.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">
                 {post.hashtags.map((tag: string, index: number) => (
-                  <div key={index} className="text-blue-400">
-                    {tag}
-                  </div>
+                  <span key={index} className="text-blue-400">{tag}</span>
                 ))}
               </div>
             )}
@@ -469,13 +426,16 @@ export default function PostCard({ post, currentUser }: any) {
             {/* アクションボタン */}
             <div className="flex justify-between mt-5 max-w-md text-zinc-500">
 
-              {/* リプライ */}
-              <button className="hover:text-sky-400 flex items-center gap-2 transition">
+              {/* 💬 リプライ → 詳細ページへ */}
+              <Link
+                href={`/post/${post.id}`}
+                className="hover:text-sky-400 flex items-center gap-2 transition"
+              >
                 <span>💬</span>
                 <span>{post.replies || 0}</span>
-              </button>
+              </Link>
 
-              {/* リポスト（モーダル経由） */}
+              {/* 🔁 リポスト */}
               <div className="relative">
                 <button
                   onClick={(e) => {
@@ -483,9 +443,7 @@ export default function PostCard({ post, currentUser }: any) {
                     setShowRepostModal((prev) => !prev);
                   }}
                   className={`flex items-center gap-2 transition ${
-                    isReposted
-                      ? "text-green-400"
-                      : "hover:text-green-400"
+                    isReposted ? "text-green-400" : "hover:text-green-400"
                   }`}
                 >
                   <span>🔁</span>
@@ -502,7 +460,7 @@ export default function PostCard({ post, currentUser }: any) {
                 )}
               </div>
 
-              {/* いいね */}
+              {/* ❤️ いいね */}
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -516,7 +474,7 @@ export default function PostCard({ post, currentUser }: any) {
                 <span>{post.likes || 0}</span>
               </button>
 
-              {/* ブックマーク */}
+              {/* 🔖 ブックマーク */}
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -532,10 +490,10 @@ export default function PostCard({ post, currentUser }: any) {
 
             </div>
           </div>
-        </Link>
+        </div>
 
         {/* ⋯ メニュー */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             onClick={() => setOpen(!open)}
             className="text-zinc-500 hover:text-white text-2xl px-2"
@@ -551,7 +509,6 @@ export default function PostCard({ post, currentUser }: any) {
               >
                 このクリートを通報
               </button>
-
               {canDelete && (
                 <button
                   onClick={deletePost}
@@ -565,7 +522,7 @@ export default function PostCard({ post, currentUser }: any) {
         </div>
       </div>
 
-      {/* 引用モーダル（全画面） */}
+      {/* 引用モーダル */}
       {showQuoteModal && (
         <QuoteModal
           targetPost={post}
