@@ -290,7 +290,7 @@ export default function Home() {
           <div className="flex items-center justify-between mt-4">
             {/* 画像選択ボタン */}
             <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-              🖼
+              画像を選択
               <input
                 type="file"
                 accept="image/*"
