@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Layout from "@/components/Layout";
 import { auth, db } from "@/lib/firebase";
@@ -8,47 +8,27 @@ import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
 import Link from "next/link";
 
-export default function SearchPage() {
+// ───────────────────────────────────────
+// useSearchParams を使う部分を切り出す
+// ───────────────────────────────────────
+function SearchContent({
+  currentUser,
+  users,
+  posts,
+}: {
+  currentUser: any;
+  users: any[];
+  posts: any[];
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
-
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [search, setSearch] = useState("");
-  const [users, setUsers] = useState<any[]>([]);
-  const [posts, setPosts] = useState<any[]>([]);
 
   // URLの ?q= を検索欄に反映
   useEffect(() => {
     const q = searchParams.get("q") || "";
     setSearch(q);
   }, [searchParams]);
-
-  // ログイン確認
-  useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        location.href = "/login";
-        return;
-      }
-      setCurrentUser(user);
-    });
-  }, []);
-
-  // ユーザー取得
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsub();
-  }, []);
-
-  // 投稿取得
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "posts"), (snap) => {
-      setPosts(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsub();
-  }, []);
 
   // 検索欄が変わったらURLも更新
   const handleSearch = (value: string) => {
@@ -76,13 +56,7 @@ export default function SearchPage() {
     : [];
 
   return (
-    <Layout currentUser={currentUser}>
-
-      {/* タイトル */}
-      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
-        <div className="text-4xl font-bold">検索</div>
-      </div>
-
+    <>
       {/* 検索欄 */}
       <div className="p-4 border-b border-zinc-800">
         <input
@@ -94,7 +68,7 @@ export default function SearchPage() {
         />
       </div>
 
-      {/* 検索前は何も表示しない */}
+      {/* 検索前 */}
       {!search.trim() && (
         <p className="text-center text-zinc-600 py-16">
           キーワードを入力して検索
@@ -151,17 +125,15 @@ export default function SearchPage() {
                   src={p.icon || "/default.png"}
                   className="w-10 h-10 rounded-full object-cover bg-zinc-700"
                 />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{p.name}</span>
-                    {p.verified && <img src="/verified-blue.png" className="w-4 h-4" />}
-                    {p.admin && <img src="/verified-gold.png" className="w-4 h-4" />}
-                    <span className="text-zinc-500 text-sm">@{p.username}</span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white">{p.name}</span>
+                  {p.verified && <img src="/verified-blue.png" className="w-4 h-4" />}
+                  {p.admin && <img src="/verified-gold.png" className="w-4 h-4" />}
+                  <span className="text-zinc-500 text-sm">@{p.username}</span>
                 </div>
               </div>
 
-              {/* 本文（ハッシュタグ部分を青く） */}
+              {/* 本文（ハッシュタグ青） */}
               <p className="text-white whitespace-pre-wrap break-words">
                 {p.text?.split(/(#[^\s#]+)/g).map((part: string, i: number) =>
                   /^#[^\s#]+/.test(part) ? (
@@ -198,6 +170,67 @@ export default function SearchPage() {
           )}
         </div>
       )}
+    </>
+  );
+}
+
+// ───────────────────────────────────────
+// メインページ（Suspense でラップ）
+// ───────────────────────────────────────
+export default function SearchPage() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [users, setUsers] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
+
+  // ログイン確認
+  useEffect(() => {
+    return onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        location.href = "/login";
+        return;
+      }
+      setCurrentUser(user);
+    });
+  }, []);
+
+  // ユーザー取得
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "users"), (snap) => {
+      setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  // 投稿取得
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "posts"), (snap) => {
+      setPosts(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  return (
+    <Layout currentUser={currentUser}>
+
+      {/* タイトル */}
+      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
+        <div className="text-4xl font-bold">検索</div>
+      </div>
+
+      {/* useSearchParams を使う部分を Suspense でラップ */}
+      <Suspense fallback={
+        <div className="p-4 border-b border-zinc-800">
+          <div className="w-full bg-zinc-900 rounded-full px-6 py-4 text-lg text-zinc-600">
+            読み込み中...
+          </div>
+        </div>
+      }>
+        <SearchContent
+          currentUser={currentUser}
+          users={users}
+          posts={posts}
+        />
+      </Suspense>
 
     </Layout>
   );
