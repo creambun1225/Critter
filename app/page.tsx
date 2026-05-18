@@ -20,15 +20,21 @@ import Layout from "@/components/Layout";
 import PostCard from "@/components/PostCard";
 
 // ───────────────────────────────────────
+// 画像を Base64 URL に変換
+// ───────────────────────────────────────
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ───────────────────────────────────────
 // アナリティクスモーダル
 // ───────────────────────────────────────
-function AnalyticsModal({
-  post,
-  onClose,
-}: {
-  post: any;
-  onClose: () => void;
-}) {
+function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
   const [tab, setTab] = useState<"likes" | "reposts" | "quotes" | "replies">("likes");
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,49 +49,36 @@ function AnalyticsModal({
   useEffect(() => {
     setLoading(true);
     setUsers([]);
-
-    const fetchUsers = async () => {
+    const fetch = async () => {
       try {
         if (tab === "likes" || tab === "reposts") {
-          const uids: string[] =
-            tab === "likes"
-              ? post.likedUsers || []
-              : post.repostedUsers || [];
-
+          const uids: string[] = tab === "likes" ? post.likedUsers || [] : post.repostedUsers || [];
           const results = await Promise.all(
-            uids.map(async (uid: string) => {
+            uids.map(async (uid) => {
               const snap = await getDoc(doc(db, "users", uid));
               return snap.exists() ? { uid, ...snap.data() } : null;
             })
           );
           setUsers(results.filter(Boolean));
-
         } else if (tab === "quotes") {
-          const q = query(
-            collection(db, "posts"),
-            where("quotePostId", "==", post.id)
-          );
+          const q = query(collection(db, "posts"), where("quotePostId", "==", post.id));
           const snap = await getDocs(q);
           const uids = [...new Set(snap.docs.map((d) => d.data().uid))] as string[];
           const results = await Promise.all(
-            uids.map(async (uid: string) => {
-              const userSnap = await getDoc(doc(db, "users", uid));
-              return userSnap.exists() ? { uid, ...userSnap.data() } : null;
+            uids.map(async (uid) => {
+              const s = await getDoc(doc(db, "users", uid));
+              return s.exists() ? { uid, ...s.data() } : null;
             })
           );
           setUsers(results.filter(Boolean));
-
         } else if (tab === "replies") {
-          const q = query(
-            collection(db, "posts", post.id, "replies"),
-            orderBy("createdAt", "asc")
-          );
+          const q = query(collection(db, "posts", post.id, "replies"), orderBy("createdAt", "asc"));
           const snap = await getDocs(q);
           const uids = [...new Set(snap.docs.map((d) => d.data().uid))] as string[];
           const results = await Promise.all(
-            uids.map(async (uid: string) => {
-              const userSnap = await getDoc(doc(db, "users", uid));
-              return userSnap.exists() ? { uid, ...userSnap.data() } : null;
+            uids.map(async (uid) => {
+              const s = await getDoc(doc(db, "users", uid));
+              return s.exists() ? { uid, ...s.data() } : null;
             })
           );
           setUsers(results.filter(Boolean));
@@ -94,8 +87,7 @@ function AnalyticsModal({
         setLoading(false);
       }
     };
-
-    fetchUsers();
+    fetch();
   }, [tab, post]);
 
   return (
@@ -103,40 +95,20 @@ function AnalyticsModal({
       <div className="fixed inset-0 z-40 bg-black/70" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
         <div className="w-full max-w-md bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
-
-          {/* ヘッダー */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
-            <button
-              onClick={onClose}
-              className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900"
-            >
-              ✕
-            </button>
+            <button onClick={onClose} className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900">✕</button>
             <h2 className="font-bold text-white text-lg">アナリティクス</h2>
             <div className="w-10" />
           </div>
-
-          {/* タブ */}
           <div className="flex border-b border-zinc-800 shrink-0">
             {tabs.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`flex-1 py-3 text-sm font-bold transition border-b-2 ${
-                  tab === t.key
-                    ? "border-white text-white"
-                    : "border-transparent text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
+              <button key={t.key} onClick={() => setTab(t.key)}
+                className={`flex-1 py-3 text-sm font-bold transition border-b-2 ${tab === t.key ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}>
                 {t.label}
-                {t.count !== null && (
-                  <span className="ml-1 text-xs text-zinc-500">({t.count})</span>
-                )}
+                {t.count !== null && <span className="ml-1 text-xs text-zinc-500">({t.count})</span>}
               </button>
             ))}
           </div>
-
-          {/* ユーザーリスト */}
           <div className="overflow-y-auto">
             {loading ? (
               <p className="text-center text-zinc-500 py-10">読み込み中...</p>
@@ -144,16 +116,9 @@ function AnalyticsModal({
               <p className="text-center text-zinc-500 py-10">まだいません</p>
             ) : (
               users.map((user) => (
-                <Link
-                  key={user.uid}
-                  href={`/user/${user.uid}`}
-                  onClick={onClose}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition"
-                >
-                  <img
-                    src={user.icon || "/default.png"}
-                    className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0"
-                  />
+                <Link key={user.uid} href={`/user/${user.uid}`} onClick={onClose}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition">
+                  <img src={user.icon || "/default.png"} className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0" />
                   <div className="min-w-0">
                     <div className="flex items-center gap-1">
                       <span className="font-bold text-white truncate">{user.name}</span>
@@ -177,30 +142,37 @@ function AnalyticsModal({
 // ───────────────────────────────────────
 export default function Home() {
   const [text, setText] = useState("");
-  const [image, setImage] = useState<any>(null);
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [posts, setPosts] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [analyticsPost, setAnalyticsPost] = useState<any>(null);
+  const [posting, setPosting] = useState(false);
+
+  // 画像選択
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 5MB 制限
+    if (file.size > 5 * 1024 * 1024) {
+      alert("画像は5MB以下にしてください");
+      return;
+    }
+
+    setImage(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
 
   // ログイン確認
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        location.href = "/login";
-        return;
-      }
-
+      if (!user) { location.href = "/login"; return; }
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()) {
         const data = snap.data();
-        setCurrentUser({
-          uid: user.uid,
-          email: user.email,
-          photoURL: user.photoURL,
-          displayName: user.displayName,
-          ...data,
-        });
+        setCurrentUser({ uid: user.uid, email: user.email, ...data });
         setUserData(data);
       }
     });
@@ -209,17 +181,9 @@ export default function Home() {
 
   // 投稿取得
   useEffect(() => {
-    const q = query(
-      collection(db, "posts"),
-      orderBy("createdAt", "desc")
-    );
+    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
-      setPosts(
-        snap.docs.map((doc: any) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-      );
+      setPosts(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
   }, []);
@@ -227,70 +191,65 @@ export default function Home() {
   // 投稿
   const createPost = async () => {
     if (!text.trim() && !image) return;
+    if (posting) return;
+    setPosting(true);
 
-    let imageUrl = "";
-
-    // Cloudinary画像アップロード
-    if (image) {
-      const formData = new FormData();
-      formData.append("file", image);
-      formData.append("upload_preset", "critter_upload");
-
-      const res = await fetch(
-        "https://api.cloudinary.com/v1_1/dp16ulupy/image/upload",
-        { method: "POST", body: formData }
-      );
-      const data = await res.json();
-      imageUrl = data.secure_url;
-    }
-
-    // スパム判定
-    const now = Date.now();
-    const spamQuery = query(
-      collection(db, "posts"),
-      where("uid", "==", currentUser.uid),
-      where("text", "==", text)
-    );
-    const spamSnap = await getDocs(spamQuery);
-    const recentPosts = spamSnap.docs.filter(
-      (d: any) => now - d.data().createdAt <= 3000
-    );
-
-    // 3回以上で削除
-    if (recentPosts.length >= 2) {
-      for (const p of recentPosts) {
-        await deleteDoc(doc(db, "posts", p.id));
+    try {
+      // 画像を Base64 に変換
+      let imageUrl = "";
+      if (image) {
+        imageUrl = await fileToBase64(image);
       }
-      alert("同じクリートを3秒以内に3回行ったため削除しました");
-      return;
+
+      // スパム判定
+      const now = Date.now();
+      const spamQuery = query(
+        collection(db, "posts"),
+        where("uid", "==", currentUser.uid),
+        where("text", "==", text)
+      );
+      const spamSnap = await getDocs(spamQuery);
+      const recentPosts = spamSnap.docs.filter(
+        (d: any) => now - d.data().createdAt <= 3000
+      );
+      if (recentPosts.length >= 2) {
+        for (const p of recentPosts) await deleteDoc(doc(db, "posts", p.id));
+        alert("同じクリートを3秒以内に3回行ったため削除しました");
+        return;
+      }
+
+      // ハッシュタグ
+      const hashtags = text.match(/#[^\s#]+/g)?.map((t) => t.slice(1)) || [];
+
+      await addDoc(collection(db, "posts"), {
+        text,
+        image: imageUrl,
+        hashtags,
+        uid: currentUser.uid,
+        name: userData?.name || "ユーザー",
+        username: userData?.username || "user",
+        icon: userData?.icon || "",
+        verified: currentUser?.verified || false,
+        admin: currentUser?.admin || false,
+        replies: 0,
+        reposts: 0,
+        likes: 0,
+        bookmarks: 0,
+        likedUsers: [],
+        repostedUsers: [],
+        bookmarkedUsers: [],
+        createdAt: Date.now(),
+      });
+
+      setText("");
+      setImage(null);
+      setImagePreview("");
+    } catch (e) {
+      console.error(e);
+      alert("投稿に失敗しました");
+    } finally {
+      setPosting(false);
     }
-
-    // ハッシュタグ
-    const hashtags = text.match(/#\w+/g) || [];
-
-    // 投稿保存
-    await addDoc(collection(db, "posts"), {
-      text,
-      image: imageUrl,
-      hashtags,
-      uid: currentUser.uid,
-      name: userData?.name || "ユーザー",
-      username: userData?.username || "user",
-      icon: userData?.icon || "",
-      verified: currentUser?.verified || false,
-      admin: currentUser?.admin || false,
-      replies: 0,
-      reposts: 0,
-      likes: 0,
-      bookmarks: 0,
-      likedUsers: [],
-      repostedUsers: [],
-      bookmarkedUsers: [],
-      createdAt: Date.now(),
-    });
-
-    setText("");
-    setImage(null);
   };
 
   return (
@@ -315,26 +274,37 @@ export default function Home() {
             className="w-full bg-black outline-none resize-none text-lg md:text-xl min-h-[120px] text-white placeholder-zinc-600"
           />
 
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImage(e.target.files?.[0])}
-            className="mt-4"
-          />
-
-          {image && (
-            <img
-              src={URL.createObjectURL(image)}
-              className="mt-4 rounded-2xl max-h-[350px] object-cover"
-            />
+          {/* 画像プレビュー */}
+          {imagePreview && (
+            <div className="relative mt-3 inline-block">
+              <img src={imagePreview} className="rounded-2xl max-h-[350px] object-cover" />
+              <button
+                onClick={() => { setImage(null); setImagePreview(""); }}
+                className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm"
+              >
+                ✕
+              </button>
+            </div>
           )}
 
-          <div className="flex justify-end mt-4">
+          <div className="flex items-center justify-between mt-4">
+            {/* 画像選択ボタン */}
+            <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
+              🖼
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </label>
+
             <button
               onClick={createPost}
-              className="bg-blue-500 hover:bg-blue-600 transition px-6 md:px-8 py-3 rounded-full text-lg font-bold"
+              disabled={posting || (!text.trim() && !image)}
+              className="bg-blue-500 hover:bg-blue-600 transition px-6 md:px-8 py-3 rounded-full text-lg font-bold disabled:opacity-40"
             >
-              クリート
+              {posting ? "投稿中..." : "クリート"}
             </button>
           </div>
         </div>
@@ -354,10 +324,7 @@ export default function Home() {
 
       {/* アナリティクスモーダル */}
       {analyticsPost && (
-        <AnalyticsModal
-          post={analyticsPost}
-          onClose={() => setAnalyticsPost(null)}
-        />
+        <AnalyticsModal post={analyticsPost} onClose={() => setAnalyticsPost(null)} />
       )}
 
     </Layout>
