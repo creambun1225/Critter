@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import {
   doc,
@@ -12,6 +13,43 @@ import {
   increment,
   arrayUnion,
 } from "firebase/firestore";
+
+// ───────────────────────────────────────
+// 本文パーサー（ハッシュタグを青リンクに）
+// ハッシュタグ = # の直後から空白・改行・文字列末尾まで
+// ───────────────────────────────────────
+function PostText({ text }: { text: string }) {
+  const router = useRouter();
+
+  if (!text) return null;
+
+  // #〜 を空白/改行/末尾で区切ってトークン化
+  const parts = text.split(/(#[^\s#]+)/g);
+
+  return (
+    <span className="whitespace-pre-wrap break-words text-[16px] text-white">
+      {parts.map((part, i) => {
+        if (/^#[^\s#]+/.test(part)) {
+          const word = part.slice(1); // # を除いたワード
+          return (
+            <span
+              key={i}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                router.push(`/search?q=${encodeURIComponent(word)}`);
+              }}
+              className="text-blue-400 hover:underline cursor-pointer"
+            >
+              {part}
+            </span>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </span>
+  );
+}
 
 // ───────────────────────────────────────
 // 引用元カード
@@ -146,9 +184,7 @@ function QuoteModal({
     setLoading(true);
     try {
       const hashtags =
-        text.match(/#[\w\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+/g)?.map(
-          (t) => t.slice(1)
-        ) ?? [];
+        text.match(/#[^\s#]+/g)?.map((t) => t.slice(1)) ?? [];
 
       const quoteSnap = {
         id: targetPost.id,
@@ -206,10 +242,7 @@ function QuoteModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
         <div className="w-full max-w-lg bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
-            <button
-              onClick={onClose}
-              className="text-zinc-400 hover:text-white text-2xl px-1"
-            >
+            <button onClick={onClose} className="text-zinc-400 hover:text-white text-2xl px-1">
               ✕
             </button>
             <h2 className="font-bold text-white">引用リポスト</h2>
@@ -249,11 +282,7 @@ function QuoteModal({
           <div className="flex items-center justify-end px-4 py-3 border-t border-zinc-800 shrink-0">
             <span
               className={`text-sm font-medium ${
-                remaining < 0
-                  ? "text-red-500"
-                  : remaining < 20
-                  ? "text-yellow-500"
-                  : "text-zinc-500"
+                remaining < 0 ? "text-red-500" : remaining < 20 ? "text-yellow-500" : "text-zinc-500"
               }`}
             >
               {remaining}
@@ -377,7 +406,7 @@ export default function PostCard({
 
           <div className="flex-1 min-w-0">
 
-            {/* 名前・バッジ */}
+            {/* 名前・バッジ・ID・時間 */}
             <div className="flex items-center gap-2 flex-wrap">
               <Link
                 href={`/user/${post.uid}`}
@@ -402,15 +431,21 @@ export default function PostCard({
               </div>
             )}
 
-            {/* 本文 → 詳細ページ */}
+            {/* 本文（ハッシュタグ青リンク付き） */}
+            {/* 詳細ページへのリンクは本文の非ハッシュタグ部分クリックで遷移 */}
             <Link
               href={`/post/${post.id}`}
-              className="block mt-2 whitespace-pre-wrap break-words text-[16px] text-white hover:opacity-90 transition"
+              className="block mt-2"
+              onClick={(e) => {
+                // ハッシュタグ span がクリックされた場合は詳細ページへ行かない
+                const target = e.target as HTMLElement;
+                if (target.dataset.hashtag) e.preventDefault();
+              }}
             >
-              {post.text}
+              <PostText text={post.text} />
             </Link>
 
-            {/* 画像 → 詳細ページ */}
+            {/* 画像 */}
             {post.image && (
               <Link href={`/post/${post.id}`}>
                 <img
@@ -423,15 +458,6 @@ export default function PostCard({
             {/* 引用元カード */}
             {post.isQuoteRepost && (
               <QuotePostCard post={post.quotePost ?? null} />
-            )}
-
-            {/* ハッシュタグ */}
-            {post.hashtags?.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {post.hashtags.map((tag: string, index: number) => (
-                  <span key={index} className="text-blue-400">{tag}</span>
-                ))}
-              </div>
             )}
 
             {/* アクションボタン */}
