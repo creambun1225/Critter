@@ -9,14 +9,12 @@ import {
   collection,
   query,
   where,
-  orderBy,
   onSnapshot,
   doc,
   getDoc,
   updateDoc,
 } from "firebase/firestore";
 
-// 通知タイプ別の文言・アイコン
 function notificationLabel(type: string) {
   switch (type) {
     case "like":   return { emoji: "❤️", text: "さんがいいねしました" };
@@ -34,22 +32,17 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        location.href = "/login";
-        return;
-      }
+      if (!user) { location.href = "/login"; return; }
 
       const userSnap = await getDoc(doc(db, "users", user.uid));
       if (!userSnap.exists()) return;
       const userData = userSnap.data();
       setCurrentUser({ uid: user.uid, ...userData });
 
-      // 自分宛の通知（いいね・リポスト・引用・返信）
+      // 自分宛の通知（orderBy なし → JS でソート）
       const personalQ = query(
         collection(db, "notifications"),
-        where("toUid", "==", user.uid),
-        where("type", "in", ["like", "repost", "quote", "reply"]),
-        orderBy("createdAt", "desc")
+        where("toUid", "==", user.uid)
       );
 
       const unsubPersonal = onSnapshot(personalQ, async (snap) => {
@@ -65,6 +58,7 @@ export default function NotificationsPage() {
         }
 
         setNotifications((prev) => {
+          // 通報通知と合算してcreatedAt降順
           const reports = prev.filter((n) => n.type === "report");
           return [...list, ...reports].sort((a, b) => b.createdAt - a.createdAt);
         });
@@ -74,8 +68,7 @@ export default function NotificationsPage() {
       if (userData.admin) {
         const reportQ = query(
           collection(db, "notifications"),
-          where("type", "==", "report"),
-          orderBy("createdAt", "desc")
+          where("type", "==", "report")
         );
 
         onSnapshot(reportQ, async (snap) => {
@@ -131,10 +124,7 @@ export default function NotificationsPage() {
                       {n.postText && (
                         <p className="text-zinc-500 text-sm mt-1 line-clamp-2">{n.postText}</p>
                       )}
-                      <Link
-                        href={`/post/${n.postId}`}
-                        className="text-blue-400 text-sm mt-1 inline-block hover:underline"
-                      >
+                      <Link href={`/post/${n.postId}`} className="text-blue-400 text-sm mt-1 inline-block hover:underline">
                         通報されたクリートを表示 →
                       </Link>
                     </div>
@@ -143,15 +133,14 @@ export default function NotificationsPage() {
               );
             }
 
-            // 通常通知（いいね・リポスト・引用・返信）
+            // 通常通知
             return (
               <div key={n.id} className="border-b border-zinc-800 p-5 hover:bg-zinc-950 transition">
                 <div className="flex items-start gap-3">
-                  {/* 絵文字アイコン */}
                   <span className="text-2xl shrink-0 mt-1">{emoji}</span>
-
                   <div className="flex-1 min-w-0">
-                    {/* ユーザーアイコン + 名前 → プロフィールへ */}
+
+                    {/* アイコン + 名前 → プロフィールへ */}
                     <Link
                       href={`/user/${n.fromUid}`}
                       className="flex items-center gap-2 mb-1 w-fit hover:opacity-80 transition"
