@@ -39,57 +39,73 @@ export default function Layout({
 
   useEffect(() => {
 
-    if (
-      !currentUser?.uid ||
-      !currentUser?.admin
-    ) return;
+    if (!currentUser?.uid) return;
 
-    const q = query(
-      collection(
-        db,
-        "notifications"
-      ),
-      where(
-        "type",
-        "==",
-        "report"
-      )
+    let personalUnsub: (() => void) | null = null;
+    let reportUnsub: (() => void) | null = null;
+    let personalUnread = 0;
+    let reportUnread = 0;
+
+    // 自分宛の通知（いいね・リポスト・引用・返信）
+    const personalQ = query(
+      collection(db, "notifications"),
+      where("toUid", "==", currentUser.uid)
     );
 
-    const unsub =
-      onSnapshot(q, (snap)=>{
+    personalUnsub = onSnapshot(personalQ, (snap) => {
 
-        let unread = 0;
+      personalUnread = 0;
 
-        snap.docs.forEach((d:any)=>{
+      snap.docs.forEach((d: any) => {
 
-          const data =
-            d.data();
+        const data = d.data();
+        const readBy = data.readBy || [];
 
-          const readBy =
-            data.readBy || [];
+        if (!readBy.includes(currentUser.uid)) {
+          personalUnread++;
+        }
 
-          if (
-            !readBy.includes(
-              currentUser.uid
-            )
-          ) {
+      });
 
-            unread++;
+      setNotificationCount(personalUnread + reportUnread);
 
+    });
+
+    // 管理者なら通報通知も合算
+    if (currentUser.admin) {
+
+      const reportQ = query(
+        collection(db, "notifications"),
+        where("type", "==", "report")
+      );
+
+      reportUnsub = onSnapshot(reportQ, (snap) => {
+
+        reportUnread = 0;
+
+        snap.docs.forEach((d: any) => {
+
+          const data = d.data();
+          const readBy = data.readBy || [];
+
+          if (!readBy.includes(currentUser.uid)) {
+            reportUnread++;
           }
 
         });
 
-        setNotificationCount(
-          unread
-        );
+        setNotificationCount(personalUnread + reportUnread);
 
       });
 
-    return ()=>unsub();
+    }
 
-  }, [currentUser]);
+    return () => {
+      if (personalUnsub) personalUnsub();
+      if (reportUnsub) reportUnsub();
+    };
+
+  }, [currentUser?.uid, currentUser?.admin]);
 
   const menus = [
 
@@ -194,7 +210,7 @@ export default function Layout({
 
                     <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs min-w-[20px] h-5 px-1 rounded-full flex items-center justify-center font-bold">
 
-                      {notificationCount}
+                      {notificationCount > 99 ? "99+" : notificationCount}
 
                     </div>
 
@@ -340,7 +356,7 @@ export default function Layout({
 
             <div className="text-zinc-500 text-sm mt-4 px-2">
 
-              Critter v1.0.4
+              Critter v1.0.3
 
             </div>
 
@@ -372,7 +388,7 @@ export default function Layout({
 
             <div className="absolute -top-2 -right-3 bg-blue-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center font-bold">
 
-              {notificationCount}
+              {notificationCount > 99 ? "99+" : notificationCount}
 
             </div>
 
