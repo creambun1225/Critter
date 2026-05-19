@@ -3,16 +3,19 @@
 import Link from "next/link";
 
 import {
-  usePathname
+  usePathname,
+  useRouter,
 } from "next/navigation";
 
 import {
   useEffect,
-  useState
+  useState,
+  useRef,
 } from "react";
 
 import {
-  db
+  db,
+  auth,
 } from "@/lib/firebase";
 
 import {
@@ -22,7 +25,15 @@ import {
   onSnapshot,
   orderBy,
   limit,
+  getDocs,
+  getDoc,
+  doc,
 } from "firebase/firestore";
+
+import {
+  signOut,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 
 export default function Layout({
   children,
@@ -32,16 +43,72 @@ export default function Layout({
   currentUser?: any;
 }) {
 
-  const pathname =
-    usePathname();
+  const pathname = usePathname();
+  const router = useRouter();
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const [notificationCount,
-    setNotificationCount] =
-    useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [trends, setTrends] = useState<{ tag: string; count: number }[]>([]);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
-  // トレンド（ハッシュタグ上位3件）
-  const [trends, setTrends] =
-    useState<{ tag: string; count: number }[]>([]);
+  // 保存済みアカウント（localStorageで管理）
+  const [savedAccounts, setSavedAccounts] = useState<
+    { uid: string; name: string; username: string; icon: string; email: string }[]
+  >([]);
+
+  // 保存済みアカウント読み込み
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("critter_accounts");
+      if (raw) setSavedAccounts(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  // 現在のアカウントを保存済みリストに追加
+  useEffect(() => {
+    if (!currentUser?.uid || !currentUser?.email) return;
+    try {
+      const raw = localStorage.getItem("critter_accounts");
+      const existing: any[] = raw ? JSON.parse(raw) : [];
+      const filtered = existing.filter((a) => a.uid !== currentUser.uid);
+      const updated = [
+        {
+          uid: currentUser.uid,
+          name: currentUser.name || "ユーザー",
+          username: currentUser.username || "user",
+          icon: currentUser.icon || "",
+          email: currentUser.email || "",
+        },
+        ...filtered,
+      ].slice(0, 5); // 最大5アカウント
+      localStorage.setItem("critter_accounts", JSON.stringify(updated));
+      setSavedAccounts(updated);
+    } catch {}
+  }, [currentUser?.uid]);
+
+  // メニュー外クリックで閉じる
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowAccountMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // ログアウト
+  const handleLogout = async () => {
+    await signOut(auth);
+    // 現在のアカウントをリストから削除
+    try {
+      const raw = localStorage.getItem("critter_accounts");
+      const existing: any[] = raw ? JSON.parse(raw) : [];
+      const updated = existing.filter((a) => a.uid !== currentUser?.uid);
+      localStorage.setItem("critter_accounts", JSON.stringify(updated));
+    } catch {}
+    location.href = "/login";
+  };
 
   // 通知バッジ
   useEffect(() => {
@@ -57,46 +124,31 @@ export default function Layout({
     );
 
     const unsubPersonal = onSnapshot(personalQ, (snap) => {
-
       personalUnread = 0;
-
       snap.docs.forEach((d: any) => {
         const data = d.data();
         const readBy = data.readBy || [];
-        if (!readBy.includes(currentUser.uid)) {
-          personalUnread++;
-        }
+        if (!readBy.includes(currentUser.uid)) personalUnread++;
       });
-
       setNotificationCount(personalUnread + reportUnread);
-
     });
 
     let unsubReport: (() => void) | null = null;
 
     if (currentUser.admin) {
-
       const reportQ = query(
         collection(db, "notifications"),
         where("type", "==", "report")
       );
-
       unsubReport = onSnapshot(reportQ, (snap) => {
-
         reportUnread = 0;
-
         snap.docs.forEach((d: any) => {
           const data = d.data();
           const readBy = data.readBy || [];
-          if (!readBy.includes(currentUser.uid)) {
-            reportUnread++;
-          }
+          if (!readBy.includes(currentUser.uid)) reportUnread++;
         });
-
         setNotificationCount(personalUnread + reportUnread);
-
       });
-
     }
 
     return () => {
@@ -106,7 +158,7 @@ export default function Layout({
 
   }, [currentUser?.uid, currentUser?.admin]);
 
-  // トレンド集計（最新20投稿のハッシュタグ）
+  // トレンド集計
   useEffect(() => {
 
     const q = query(
@@ -119,33 +171,38 @@ export default function Layout({
 
       const tagCount: Record<string, number> = {};
 
+      const stopWords = new Set([
+        "の", "に", "は", "を", "が", "で", "と", "た", "て",
+        "も", "な", "い", "る", "し", "れ", "さ", "ん", "だ",
+        "か", "ら", "や", "よ", "ね", "わ", "け", "ど",
+        "あ", "う", "え", "お", "http", "https", "www",
+        "rt", "the", "a", "an", "is", "in", "it", "of",
+        "to", "and", "or", "for",
+      ]);
+
       snap.docs.forEach((d: any) => {
-
-        const data = d.data();
-        const text: string = data.text || "";
-
-        // テキストから #タグ を抽出
-        const tags = text.match(/#[^\s#]+/g) || [];
-
-        tags.forEach((tag) => {
-          const normalized = tag.toLowerCase();
-          tagCount[normalized] =
-            (tagCount[normalized] || 0) + 1;
+        const text: string = d.data().text || "";
+        const normalized = text.replace(/#/g, "");
+        const words = normalized
+          .split(/[\s\u3000、。！？!?,.]+/)
+          .map((w: string) => w.toLowerCase().trim())
+          .filter((w: string) =>
+            w.length >= 2 &&
+            !stopWords.has(w) &&
+            !/^\d+$/.test(w)
+          );
+        words.forEach((word: string) => {
+          tagCount[word] = (tagCount[word] || 0) + 1;
         });
-
       });
 
-      // 出現回数順にソートして上位3件
       const sorted = Object.entries(tagCount)
+        .filter(([, count]) => count >= 1)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
-        .map(([tag, count]) => ({
-          tag: tag.slice(1), // # を除く
-          count,
-        }));
+        .map(([tag, count]) => ({ tag, count }));
 
       setTrends(sorted);
-
     });
 
     return () => unsub();
@@ -153,45 +210,18 @@ export default function Layout({
   }, []);
 
   const menus = [
-
-    {
-      href: "/",
-      icon: "🏠",
-      label: "ホーム"
-    },
-
-    {
-      href: "/search",
-      icon: "🔎",
-      label: "検索"
-    },
-
-    {
-      href: "/notifications",
-      icon: "🔔",
-      label: "通知"
-    },
-
-    {
-      href:
-        `/user/${currentUser?.uid}`,
-      icon: "👤",
-      label: "プロフィール"
-    },
-
-    {
-      href: "/bookmarks",
-      icon: "🔖",
-      label: "ブックマーク"
-    },
-
-    {
-      href: "/settings",
-      icon: "⚙️",
-      label: "設定"
-    }
-
+    { href: "/",                          icon: "🏠", label: "ホーム" },
+    { href: "/search",                    icon: "🔎", label: "検索" },
+    { href: "/notifications",             icon: "🔔", label: "通知" },
+    { href: `/user/${currentUser?.uid}`,  icon: "👤", label: "プロフィール" },
+    { href: "/bookmarks",                 icon: "🔖", label: "ブックマーク" },
+    { href: "/settings",                  icon: "⚙️", label: "設定" },
   ];
+
+  // 現在のアカウント以外の保存済みアカウント
+  const otherAccounts = savedAccounts.filter(
+    (a) => a.uid !== currentUser?.uid
+  );
 
   return (
 
@@ -207,19 +237,12 @@ export default function Layout({
             href="/"
             className="w-14 h-14 rounded-full hover:bg-zinc-900 flex items-center justify-center mb-4 overflow-hidden"
           >
-
-            <img
-              src="/logo.png"
-              className="w-full h-full object-cover"
-            />
-
+            <img src="/logo.png" className="w-full h-full object-cover" />
           </Link>
 
           {/* メニュー */}
           <div className="flex flex-col gap-1">
-
-            {menus.map((menu)=>(
-
+            {menus.map((menu) => (
               <Link
                 key={menu.href}
                 href={menu.href}
@@ -231,94 +254,118 @@ export default function Layout({
                   font-bold
                   transition
                   hover:bg-zinc-900
-
-                  ${
-                    pathname === menu.href
-                    ? "bg-zinc-900"
-                    : ""
-                  }
+                  ${pathname === menu.href ? "bg-zinc-900" : ""}
                 `}
               >
-
                 <div className="relative">
-
-                  <span className="text-3xl">
-
-                    {menu.icon}
-
-                  </span>
-
-                  {/* 通知バッジ */}
-                  {menu.href ===
-                    "/notifications" &&
-                    notificationCount > 0 && (
-
+                  <span className="text-3xl">{menu.icon}</span>
+                  {menu.href === "/notifications" && notificationCount > 0 && (
                     <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs min-w-[20px] h-5 px-1 rounded-full flex items-center justify-center font-bold">
-
                       {notificationCount > 99 ? "99+" : notificationCount}
-
                     </div>
-
                   )}
-
                 </div>
-
-                <span>
-
-                  {menu.label}
-
-                </span>
-
+                <span>{menu.label}</span>
               </Link>
-
             ))}
-
           </div>
 
-          {/* ボタン */}
+          {/* クリートボタン */}
           <button className="mt-6 bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-xl font-bold">
-
             クリート
-
           </button>
 
-          {/* ユーザー */}
-          <div className="mt-auto">
+          {/* アカウントメニュー */}
+          <div className="mt-auto relative" ref={menuRef}>
 
-            <Link
-              href={`/user/${currentUser?.uid}`}
-              className="flex items-center gap-3 hover:bg-zinc-900 rounded-full p-3 transition"
-            >
+            {/* アカウントポップアップ */}
+            {showAccountMenu && (
+              <div className="absolute bottom-20 left-0 w-72 bg-black border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50">
 
-              <img
-                src={
-                  currentUser?.icon ||
-                  "/default.png"
-                }
-                className="w-12 h-12 rounded-full object-cover bg-zinc-700"
-              />
+                {/* 現在のアカウント */}
+                <Link
+                  href={`/user/${currentUser?.uid}`}
+                  onClick={() => setShowAccountMenu(false)}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition"
+                >
+                  <img
+                    src={currentUser?.icon || "/default.png"}
+                    className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-white truncate">
+                      {currentUser?.name || "ユーザー"}
+                    </div>
+                    <div className="text-zinc-500 text-sm truncate">
+                      @{currentUser?.username || "user"}
+                    </div>
+                  </div>
+                  {/* チェックマーク（現在のアカウント） */}
+                  <span className="text-blue-400 text-xl shrink-0">✓</span>
+                </Link>
 
-              <div className="min-w-0">
+                {/* 他のアカウント */}
+                {otherAccounts.map((account) => (
+                  <Link
+                    key={account.uid}
+                    href={`/user/${account.uid}`}
+                    onClick={() => setShowAccountMenu(false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition border-t border-zinc-800"
+                  >
+                    <img
+                      src={account.icon || "/default.png"}
+                      className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-white truncate">{account.name}</div>
+                      <div className="text-zinc-500 text-sm truncate">@{account.username}</div>
+                    </div>
+                  </Link>
+                ))}
 
-                <div className="font-bold truncate">
+                <div className="border-t border-zinc-800" />
 
-                  {currentUser?.name ||
-                    "ユーザー"}
+                {/* 既存のアカウントを追加 */}
+                <Link
+                  href="/login"
+                  onClick={() => setShowAccountMenu(false)}
+                  className="block px-4 py-3 hover:bg-zinc-900 transition text-white font-bold"
+                >
+                  既存のアカウントを追加
+                </Link>
 
-                </div>
+                <div className="border-t border-zinc-800" />
 
-                <div className="text-zinc-500 text-sm truncate">
-
-                  @{
-                    currentUser?.username ||
-                    "user"
-                  }
-
-                </div>
+                {/* ログアウト */}
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition text-white font-bold"
+                >
+                  @{currentUser?.username || "user"} からログアウト
+                </button>
 
               </div>
+            )}
 
-            </Link>
+            {/* アカウントボタン（クリックでポップアップ） */}
+            <button
+              onClick={() => setShowAccountMenu((prev) => !prev)}
+              className="flex items-center gap-3 hover:bg-zinc-900 rounded-full p-3 transition w-full text-left"
+            >
+              <img
+                src={currentUser?.icon || "/default.png"}
+                className="w-12 h-12 rounded-full object-cover bg-zinc-700 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="font-bold truncate">
+                  {currentUser?.name || "ユーザー"}
+                </div>
+                <div className="text-zinc-500 text-sm truncate">
+                  @{currentUser?.username || "user"}
+                </div>
+              </div>
+              <span className="text-zinc-500 text-lg">···</span>
+            </button>
 
           </div>
 
@@ -326,14 +373,11 @@ export default function Layout({
 
         {/* 真ん中 */}
         <main className="flex-1 border-r border-l border-zinc-800 min-h-screen max-w-[700px] w-full">
-
           {children}
-
         </main>
 
         {/* 右 */}
         <div className="hidden xl:block w-[350px] p-4">
-
           <div className="sticky top-4">
 
             <input
@@ -342,59 +386,37 @@ export default function Layout({
             />
 
             <div className="bg-zinc-900 rounded-3xl overflow-hidden">
-
               <div className="p-5 text-2xl font-bold border-b border-zinc-800">
-
                 トレンド
-
               </div>
 
               {trends.length === 0 ? (
-
                 <div className="p-5 text-zinc-500 text-sm">
-
                   トレンドはまだありません
-
                 </div>
-
               ) : (
-
                 trends.map((trend, i) => (
-
                   <Link
                     key={i}
                     href={`/search?q=${encodeURIComponent(trend.tag)}`}
                     className="block p-5 hover:bg-zinc-800 transition cursor-pointer border-t border-zinc-800 first:border-t-0"
                   >
-
                     <div className="text-zinc-500 text-sm">
-
                       トレンド · {trend.count}件
-
                     </div>
-
                     <div className="font-bold text-xl">
-
-                      #{trend.tag}
-
+                      {trend.tag}
                     </div>
-
                   </Link>
-
                 ))
-
               )}
-
             </div>
 
             <div className="text-zinc-500 text-sm mt-4 px-2">
-
-              Critter v1.0.4
-
+              Critter v1.0.3
             </div>
 
           </div>
-
         </div>
 
       </div>
@@ -402,46 +424,24 @@ export default function Layout({
       {/* モバイル */}
       <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around py-3 md:hidden z-50">
 
-        <Link href="/">
-          🏠
-        </Link>
+        <Link href="/">🏠</Link>
 
-        <Link href="/search">
-          🔎
-        </Link>
+        <Link href="/search">🔎</Link>
 
-        <Link
-          href="/notifications"
-          className="relative"
-        >
-
+        <Link href="/notifications" className="relative">
           🔔
-
           {notificationCount > 0 && (
-
             <div className="absolute -top-2 -right-3 bg-blue-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center font-bold">
-
               {notificationCount > 99 ? "99+" : notificationCount}
-
             </div>
-
           )}
-
         </Link>
 
-        <Link href="/bookmarks">
-          🔖
-        </Link>
+        <Link href="/bookmarks">🔖</Link>
 
-        <Link
-          href={`/user/${currentUser?.uid}`}
-        >
-          👤
-        </Link>
+        <Link href={`/user/${currentUser?.uid}`}>👤</Link>
 
-        <Link href="/settings">
-          ⚙️
-        </Link>
+        <Link href="/settings">⚙️</Link>
 
       </div>
 
