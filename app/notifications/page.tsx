@@ -6,24 +6,20 @@ import Layout from "@/components/Layout";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  doc,
-  getDoc,
-  updateDoc,
+  collection, query, where, onSnapshot,
+  doc, getDoc, updateDoc,
 } from "firebase/firestore";
 
 function notificationLabel(type: string) {
   switch (type) {
-    case "like":   return { emoji: "❤️", text: "さんがいいねしました" };
-    case "repost": return { emoji: "🔁", text: "さんがリポストしました" };
-    case "quote":  return { emoji: "✏️", text: "さんが引用リポストしました" };
-    case "reply":  return { emoji: "💬", text: "さんが返信しました" };
-    case "follow": return { emoji: "👤", text: "さんにフォローされました" };
-    case "report": return { emoji: "🚨", text: "クリートが通報されました" };
-    default:       return { emoji: "🔔", text: "通知があります" };
+    case "like":    return { emoji: "❤️", text: "さんがいいねしました" };
+    case "repost":  return { emoji: "🔁", text: "さんがリポストしました" };
+    case "quote":   return { emoji: "✏️", text: "さんが引用リポストしました" };
+    case "reply":   return { emoji: "💬", text: "さんが返信しました" };
+    case "follow":  return { emoji: "👤", text: "さんにフォローされました" };
+    case "mention": return { emoji: "📣", text: "さんがメンションしました" };
+    case "report":  return { emoji: "🚨", text: "クリートが通報されました" };
+    default:        return { emoji: "🔔", text: "通知があります" };
   }
 }
 
@@ -40,7 +36,7 @@ export default function NotificationsPage() {
       const userData = userSnap.data();
       setCurrentUser({ uid: user.uid, ...userData });
 
-      // 自分宛の通知（orderBy なし → JS でソート）
+      // 自分宛の通知
       const personalQ = query(
         collection(db, "notifications"),
         where("toUid", "==", user.uid)
@@ -49,7 +45,6 @@ export default function NotificationsPage() {
       const unsubPersonal = onSnapshot(personalQ, async (snap) => {
         const list: any[] = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
 
-        // 未読を既読に
         for (const n of list) {
           if (!n.readBy?.includes(user.uid)) {
             await updateDoc(doc(db, "notifications", n.id), {
@@ -70,10 +65,8 @@ export default function NotificationsPage() {
           collection(db, "notifications"),
           where("type", "==", "report")
         );
-
         onSnapshot(reportQ, async (snap) => {
           const list: any[] = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-
           for (const n of list) {
             if (!n.readBy?.includes(user.uid)) {
               await updateDoc(doc(db, "notifications", n.id), {
@@ -81,7 +74,6 @@ export default function NotificationsPage() {
               });
             }
           }
-
           setNotifications((prev) => {
             const personal = prev.filter((n) => n.type !== "report");
             return [...personal, ...list].sort((a, b) => b.createdAt - a.createdAt);
@@ -99,12 +91,10 @@ export default function NotificationsPage() {
     <Layout currentUser={currentUser}>
       <div className="bg-black min-h-screen text-white">
 
-        {/* タイトル */}
         <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
           <div className="text-3xl font-bold">通知</div>
         </div>
 
-        {/* 通知一覧 */}
         <div>
           {notifications.length === 0 && (
             <div className="p-6 text-zinc-500 text-center">通知はありません</div>
@@ -140,62 +130,46 @@ export default function NotificationsPage() {
                   <div className="flex items-start gap-3">
                     <span className="text-2xl shrink-0 mt-1">{emoji}</span>
                     <div className="flex-1 min-w-0">
-                      <Link
-                        href={`/user/${n.fromUid}`}
-                        className="flex items-center gap-2 mb-1 w-fit hover:opacity-80 transition"
-                      >
-                        <img
-                          src={n.fromIcon || "/default.png"}
-                          className="w-9 h-9 rounded-full object-cover bg-zinc-700"
-                        />
+                      <Link href={`/user/${n.fromUid}`}
+                        className="flex items-center gap-2 mb-1 w-fit hover:opacity-80 transition">
+                        <img src={n.fromIcon || "/default.png"} className="w-9 h-9 rounded-full object-cover bg-zinc-700" />
                         <span className="font-bold text-white">{n.fromName}</span>
                         <span className="text-zinc-500 text-sm">@{n.fromUsername}</span>
                       </Link>
                       <p className="text-zinc-300 text-sm">
-                        <span className="font-bold text-white">{n.fromName}</span>
-                        {text}
+                        <span className="font-bold text-white">{n.fromName}</span>{text}
                       </p>
-                      <p className="text-zinc-600 text-xs mt-1">
-                        {new Date(n.createdAt).toLocaleString("ja-JP")}
-                      </p>
+                      <p className="text-zinc-600 text-xs mt-1">{new Date(n.createdAt).toLocaleString("ja-JP")}</p>
                     </div>
                   </div>
                 </div>
               );
             }
 
-            // 通常通知（いいね・リポスト・引用・返信）
+            // 通常通知（いいね・リポスト・引用・返信・メンション）
             return (
               <div key={n.id} className="border-b border-zinc-800 p-5 hover:bg-zinc-950 transition">
                 <div className="flex items-start gap-3">
                   <span className="text-2xl shrink-0 mt-1">{emoji}</span>
                   <div className="flex-1 min-w-0">
-                    <Link
-                      href={`/user/${n.fromUid}`}
-                      className="flex items-center gap-2 mb-1 w-fit hover:opacity-80 transition"
-                    >
-                      <img
-                        src={n.fromIcon || "/default.png"}
-                        className="w-9 h-9 rounded-full object-cover bg-zinc-700"
-                      />
+                    <Link href={`/user/${n.fromUid}`}
+                      className="flex items-center gap-2 mb-1 w-fit hover:opacity-80 transition">
+                      <img src={n.fromIcon || "/default.png"} className="w-9 h-9 rounded-full object-cover bg-zinc-700" />
                       <span className="font-bold text-white">{n.fromName}</span>
                       <span className="text-zinc-500 text-sm">@{n.fromUsername}</span>
                     </Link>
                     <p className="text-zinc-300 text-sm">
-                      <span className="font-bold text-white">{n.fromName}</span>
-                      {text}
+                      <span className="font-bold text-white">{n.fromName}</span>{text}
                     </p>
                     {n.postText && (
                       <Link
-                        href={`/post/${n.postId}`}
+                        href={n.postId ? `/post/${n.postId}` : "#"}
                         className="block mt-2 text-zinc-500 text-sm line-clamp-2 hover:text-zinc-300 transition"
                       >
                         {n.postText}
                       </Link>
                     )}
-                    <p className="text-zinc-600 text-xs mt-1">
-                      {new Date(n.createdAt).toLocaleString("ja-JP")}
-                    </p>
+                    <p className="text-zinc-600 text-xs mt-1">{new Date(n.createdAt).toLocaleString("ja-JP")}</p>
                   </div>
                 </div>
               </div>

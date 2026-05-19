@@ -12,18 +12,54 @@ import {
   updateDoc,
   increment,
   arrayUnion,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore";
 
 // ───────────────────────────────────────
-// 本文パーサー（ハッシュタグを青リンクに）
+// 本文パーサー（ハッシュタグ・メンションを青リンクに）
 // ───────────────────────────────────────
-function PostText({ text }: { text: string }) {
+function PostText({
+  text,
+  currentUser,
+}: {
+  text: string;
+  currentUser: any;
+}) {
   const router = useRouter();
   if (!text) return null;
-  const parts = text.split(/(#[^\s#]+)/g);
+
+  // #タグ と @メンション を同時にパース
+  const parts = text.split(/(#[^\s#]+|@[a-zA-Z0-9_]+)/g);
+
+  const handleMentionClick = async (
+    e: React.MouseEvent,
+    username: string
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // username からユーザーを検索してプロフィールへ
+    try {
+      const q = query(
+        collection(db, "users"),
+        where("username", "==", username)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const uid = snap.docs[0].id;
+        router.push(`/user/${uid}`);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <span className="whitespace-pre-wrap break-words text-[16px] text-white">
       {parts.map((part, i) => {
+        // ハッシュタグ
         if (/^#[^\s#]+/.test(part)) {
           const word = part.slice(1);
           return (
@@ -40,6 +76,21 @@ function PostText({ text }: { text: string }) {
             </span>
           );
         }
+
+        // メンション
+        if (/^@[a-zA-Z0-9_]+/.test(part)) {
+          const username = part.slice(1);
+          return (
+            <span
+              key={i}
+              onClick={(e) => handleMentionClick(e, username)}
+              className="text-blue-400 hover:underline cursor-pointer"
+            >
+              {part}
+            </span>
+          );
+        }
+
         return <span key={i}>{part}</span>;
       })}
     </span>
@@ -175,7 +226,6 @@ function QuoteModal({
         repostedUsers: arrayUnion(currentUser.uid),
       });
 
-      // 引用通知（自分の投稿への引用は除外）
       if (targetPost.uid !== currentUser.uid) {
         await addDoc(collection(db, "notifications"), {
           type: "quote",
@@ -185,10 +235,14 @@ function QuoteModal({
           fromIcon: currentUser.icon ?? "",
           fromUsername: currentUser.username,
           postId: targetPost.id,
+          postText: targetPost.text ?? "",
           readBy: [],
           createdAt: Date.now(),
         });
       }
+
+      // メンション通知
+      await sendMentionNotifications(text, currentUser);
 
       onClose();
     } catch (e) {
@@ -207,7 +261,8 @@ function QuoteModal({
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
             <button onClick={onClose} className="text-zinc-400 hover:text-white text-2xl px-1">✕</button>
             <h2 className="font-bold text-white">引用リポスト</h2>
-            <button onClick={handleSubmit} disabled={!canSubmit} className="bg-white text-black font-bold text-sm px-4 py-1.5 rounded-full disabled:opacity-40 hover:bg-zinc-200 transition">
+            <button onClick={handleSubmit} disabled={!canSubmit}
+              className="bg-white text-black font-bold text-sm px-4 py-1.5 rounded-full disabled:opacity-40 hover:bg-zinc-200 transition">
               {loading ? "投稿中..." : "投稿する"}
             </button>
           </div>
@@ -220,7 +275,8 @@ function QuoteModal({
                 {currentUser?.admin && <img src="/verified-gold.png" className="w-4 h-4" />}
                 <span className="text-zinc-500 text-sm">@{currentUser?.username}</span>
               </div>
-              <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="コメントを追加..." rows={4}
+              <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)}
+                placeholder="コメントを追加..." rows={4}
                 className="w-full bg-transparent text-white placeholder-zinc-600 resize-none outline-none text-base leading-relaxed" />
               <QuotePostCard post={targetPost} />
             </div>
@@ -234,6 +290,45 @@ function QuoteModal({
       </div>
     </>
   );
+}
+
+// ───────────────────────────────────────
+// メンション通知送信（共通ユーティリティ）
+// ───────────────────────────────────────
+async function sendMentionNotifications(text: string, currentUser: any) {
+  const mentions = text.match(/@([a-zA-Z0-9_]+)/g);
+  if (!mentions) return;
+
+  const usernames = [...new Set(mentions.map((m) => m.slice(1)))];
+
+  for (const username of usernames) {
+    // 自分自身へのメンションは除外
+    if (username === currentUser.username) continue;
+
+    try {
+      const q = query(
+        collection(db, "users"),
+        where("username", "==", username)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const targetUid = snap.docs[0].id;
+        await addDoc(collection(db, "notifications"), {
+          type: "mention",
+          toUid: targetUid,
+          fromUid: currentUser.uid,
+          fromName: currentUser.name,
+          fromIcon: currentUser.icon ?? "",
+          fromUsername: currentUser.username,
+          postText: text,
+          readBy: [],
+          createdAt: Date.now(),
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
 }
 
 // ───────────────────────────────────────
@@ -288,13 +383,10 @@ export default function PostCard({
     const newLikedUsers = alreadyLiked
       ? likedUsers.filter((id: string) => id !== currentUser.uid)
       : [...likedUsers, currentUser.uid];
-
     await updateDoc(doc(db, "posts", post.id), {
       likedUsers: newLikedUsers,
       likes: newLikedUsers.length,
     });
-
-    // いいね通知（自分の投稿・解除時は送らない）
     if (!alreadyLiked && post.uid !== currentUser.uid) {
       await addDoc(collection(db, "notifications"), {
         type: "like",
@@ -319,13 +411,10 @@ export default function PostCard({
     const newRepostedUsers = alreadyReposted
       ? repostedUsers.filter((id: string) => id !== currentUser.uid)
       : [...repostedUsers, currentUser.uid];
-
     await updateDoc(doc(db, "posts", post.id), {
       repostedUsers: newRepostedUsers,
       reposts: newRepostedUsers.length,
     });
-
-    // リポスト通知（自分の投稿・解除時は送らない）
     if (!alreadyReposted && post.uid !== currentUser.uid) {
       await addDoc(collection(db, "notifications"), {
         type: "repost",
@@ -350,7 +439,6 @@ export default function PostCard({
     const newBookmarkedUsers = alreadyBookmarked
       ? bookmarkedUsers.filter((id: string) => id !== currentUser.uid)
       : [...bookmarkedUsers, currentUser.uid];
-
     await updateDoc(doc(db, "posts", post.id), {
       bookmarkedUsers: newBookmarkedUsers,
       bookmarks: newBookmarkedUsers.length,
@@ -361,18 +449,24 @@ export default function PostCard({
     <div className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">
       <div className="flex justify-between items-start gap-3">
         <div className="flex gap-3 flex-1 min-w-0">
+
+          {/* アイコン */}
           <Link href={`/user/${post.uid}`} onClick={(e) => e.stopPropagation()} className="shrink-0">
             <img src={post.icon || "/default.png"} className="w-12 h-12 rounded-full object-cover bg-zinc-700" />
           </Link>
+
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <Link href={`/user/${post.uid}`} onClick={(e) => e.stopPropagation()} className="font-bold text-white text-[17px] hover:underline">
+              <Link href={`/user/${post.uid}`} onClick={(e) => e.stopPropagation()}
+                className="font-bold text-white text-[17px] hover:underline">
                 {post.name}
               </Link>
               {post.verified && <img src="/verified-blue.png" className="w-5 h-5" />}
               {post.admin && <img src="/verified-gold.png" className="w-5 h-5" />}
               <span className="text-zinc-500">@{post.username}</span>
-              <span className="text-zinc-500 text-sm">· {new Date(post.createdAt).toLocaleString("ja-JP")}</span>
+              <span className="text-zinc-500 text-sm">
+                · {new Date(post.createdAt).toLocaleString("ja-JP")}
+              </span>
             </div>
 
             {post.isQuoteRepost && (
@@ -381,11 +475,18 @@ export default function PostCard({
               </div>
             )}
 
+            {/* 本文（ハッシュタグ・メンション青リンク） */}
             <Link href={`/post/${post.id}`} className="block mt-2"
-              onClick={(e) => { const t = e.target as HTMLElement; if (t.dataset.hashtag) e.preventDefault(); }}>
-              <PostText text={post.text} />
+              onClick={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.tagName === "SPAN" && target.classList.contains("text-blue-400")) {
+                  e.preventDefault();
+                }
+              }}>
+              <PostText text={post.text} currentUser={currentUser} />
             </Link>
 
+            {/* 画像 */}
             {post.image && (
               <Link href={`/post/${post.id}`}>
                 <img src={post.image} className="mt-4 rounded-2xl max-h-[500px] object-cover border border-zinc-800 w-full" />
@@ -394,7 +495,9 @@ export default function PostCard({
 
             {post.isQuoteRepost && <QuotePostCard post={post.quotePost ?? null} />}
 
+            {/* アクションボタン */}
             <div className="flex justify-between mt-5 max-w-md text-zinc-500">
+
               <Link href={`/post/${post.id}`} className="hover:text-sky-400 flex items-center gap-2 transition">
                 <span>💬</span><span>{post.replies || 0}</span>
               </Link>
@@ -419,10 +522,12 @@ export default function PostCard({
                 className={`flex items-center gap-2 transition ${isBookmarked ? "text-yellow-400" : "hover:text-yellow-400"}`}>
                 <span>🔖</span><span>{post.bookmarks || 0}</span>
               </button>
+
             </div>
           </div>
         </div>
 
+        {/* ⋯ メニュー */}
         <div className="relative shrink-0">
           <button onClick={() => setOpen(!open)} className="text-zinc-500 hover:text-white text-2xl px-2">⋯</button>
           {open && (

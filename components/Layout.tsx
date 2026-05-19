@@ -4,7 +4,6 @@ import Link from "next/link";
 
 import {
   usePathname,
-  useRouter,
 } from "next/navigation";
 
 import {
@@ -25,9 +24,6 @@ import {
   onSnapshot,
   orderBy,
   limit,
-  getDocs,
-  getDoc,
-  doc,
 } from "firebase/firestore";
 
 import {
@@ -44,14 +40,19 @@ export default function Layout({
 }) {
 
   const pathname = usePathname();
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [notificationCount, setNotificationCount] = useState(0);
   const [trends, setTrends] = useState<{ tag: string; count: number }[]>([]);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
-  // 保存済みアカウント（localStorageで管理）
+  // パスワード入力モーダル
+  const [switchTarget, setSwitchTarget] = useState<any>(null);
+  const [password, setPassword] = useState("");
+  const [switchError, setSwitchError] = useState("");
+  const [switchLoading, setSwitchLoading] = useState(false);
+
+  // 保存済みアカウント
   const [savedAccounts, setSavedAccounts] = useState<
     { uid: string; name: string; username: string; icon: string; email: string }[]
   >([]);
@@ -80,7 +81,7 @@ export default function Layout({
           email: currentUser.email || "",
         },
         ...filtered,
-      ].slice(0, 5); // 最大5アカウント
+      ].slice(0, 5);
       localStorage.setItem("critter_accounts", JSON.stringify(updated));
       setSavedAccounts(updated);
     } catch {}
@@ -100,7 +101,6 @@ export default function Layout({
   // ログアウト
   const handleLogout = async () => {
     await signOut(auth);
-    // 現在のアカウントをリストから削除
     try {
       const raw = localStorage.getItem("critter_accounts");
       const existing: any[] = raw ? JSON.parse(raw) : [];
@@ -108,6 +108,42 @@ export default function Layout({
       localStorage.setItem("critter_accounts", JSON.stringify(updated));
     } catch {}
     location.href = "/login";
+  };
+
+  // アカウント切り替え（パスワードモーダルを開く）
+  const openSwitchModal = (account: any) => {
+    setSwitchTarget(account);
+    setPassword("");
+    setSwitchError("");
+    setShowAccountMenu(false);
+  };
+
+  // アカウント切り替え実行
+  const handleSwitch = async () => {
+    if (!switchTarget || !password) return;
+    setSwitchLoading(true);
+    setSwitchError("");
+    try {
+      await signOut(auth);
+      await signInWithEmailAndPassword(auth, switchTarget.email, password);
+      setSwitchTarget(null);
+      setPassword("");
+      location.href = "/";
+    } catch (e: any) {
+      const code = e?.code || "";
+      if (
+        code === "auth/wrong-password" ||
+        code === "auth/invalid-credential"
+      ) {
+        setSwitchError("パスワードが間違っています");
+      } else if (code === "auth/too-many-requests") {
+        setSwitchError("試行回数が多すぎます。しばらくしてから再試行してください");
+      } else {
+        setSwitchError("切り替えに失敗しました");
+      }
+    } finally {
+      setSwitchLoading(false);
+    }
   };
 
   // 通知バッジ
@@ -210,18 +246,15 @@ export default function Layout({
   }, []);
 
   const menus = [
-    { href: "/",                          icon: "🏠", label: "ホーム" },
-    { href: "/search",                    icon: "🔎", label: "検索" },
-    { href: "/notifications",             icon: "🔔", label: "通知" },
-    { href: `/user/${currentUser?.uid}`,  icon: "👤", label: "プロフィール" },
-    { href: "/bookmarks",                 icon: "🔖", label: "ブックマーク" },
-    { href: "/settings",                  icon: "⚙️", label: "設定" },
+    { href: "/",                         icon: "🏠", label: "ホーム" },
+    { href: "/search",                   icon: "🔎", label: "検索" },
+    { href: "/notifications",            icon: "🔔", label: "通知" },
+    { href: `/user/${currentUser?.uid}`, icon: "👤", label: "プロフィール" },
+    { href: "/bookmarks",                icon: "🔖", label: "ブックマーク" },
+    { href: "/settings",                 icon: "⚙️", label: "設定" },
   ];
 
-  // 現在のアカウント以外の保存済みアカウント
-  const otherAccounts = savedAccounts.filter(
-    (a) => a.uid !== currentUser?.uid
-  );
+  const otherAccounts = savedAccounts.filter((a) => a.uid !== currentUser?.uid);
 
   return (
 
@@ -248,12 +281,9 @@ export default function Layout({
                 href={menu.href}
                 className={`
                   flex items-center gap-5
-                  px-5 py-4
-                  rounded-full
-                  text-2xl
-                  font-bold
-                  transition
-                  hover:bg-zinc-900
+                  px-5 py-4 rounded-full
+                  text-2xl font-bold
+                  transition hover:bg-zinc-900
                   ${pathname === menu.href ? "bg-zinc-900" : ""}
                 `}
               >
@@ -278,7 +308,7 @@ export default function Layout({
           {/* アカウントメニュー */}
           <div className="mt-auto relative" ref={menuRef}>
 
-            {/* アカウントポップアップ */}
+            {/* ポップアップ */}
             {showAccountMenu && (
               <div className="absolute bottom-20 left-0 w-72 bg-black border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50">
 
@@ -293,24 +323,18 @@ export default function Layout({
                     className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-white truncate">
-                      {currentUser?.name || "ユーザー"}
-                    </div>
-                    <div className="text-zinc-500 text-sm truncate">
-                      @{currentUser?.username || "user"}
-                    </div>
+                    <div className="font-bold text-white truncate">{currentUser?.name || "ユーザー"}</div>
+                    <div className="text-zinc-500 text-sm truncate">@{currentUser?.username || "user"}</div>
                   </div>
-                  {/* チェックマーク（現在のアカウント） */}
                   <span className="text-blue-400 text-xl shrink-0">✓</span>
                 </Link>
 
                 {/* 他のアカウント */}
                 {otherAccounts.map((account) => (
-                  <Link
+                  <button
                     key={account.uid}
-                    href={`/user/${account.uid}`}
-                    onClick={() => setShowAccountMenu(false)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition border-t border-zinc-800"
+                    onClick={() => openSwitchModal(account)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition border-t border-zinc-800 w-full text-left"
                   >
                     <img
                       src={account.icon || "/default.png"}
@@ -320,7 +344,7 @@ export default function Layout({
                       <div className="font-bold text-white truncate">{account.name}</div>
                       <div className="text-zinc-500 text-sm truncate">@{account.username}</div>
                     </div>
-                  </Link>
+                  </button>
                 ))}
 
                 <div className="border-t border-zinc-800" />
@@ -347,7 +371,7 @@ export default function Layout({
               </div>
             )}
 
-            {/* アカウントボタン（クリックでポップアップ） */}
+            {/* アカウントボタン */}
             <button
               onClick={() => setShowAccountMenu((prev) => !prev)}
               className="flex items-center gap-3 hover:bg-zinc-900 rounded-full p-3 transition w-full text-left"
@@ -357,12 +381,8 @@ export default function Layout({
                 className="w-12 h-12 rounded-full object-cover bg-zinc-700 shrink-0"
               />
               <div className="flex-1 min-w-0">
-                <div className="font-bold truncate">
-                  {currentUser?.name || "ユーザー"}
-                </div>
-                <div className="text-zinc-500 text-sm truncate">
-                  @{currentUser?.username || "user"}
-                </div>
+                <div className="font-bold truncate">{currentUser?.name || "ユーザー"}</div>
+                <div className="text-zinc-500 text-sm truncate">@{currentUser?.username || "user"}</div>
               </div>
               <span className="text-zinc-500 text-lg">···</span>
             </button>
@@ -386,14 +406,9 @@ export default function Layout({
             />
 
             <div className="bg-zinc-900 rounded-3xl overflow-hidden">
-              <div className="p-5 text-2xl font-bold border-b border-zinc-800">
-                トレンド
-              </div>
-
+              <div className="p-5 text-2xl font-bold border-b border-zinc-800">トレンド</div>
               {trends.length === 0 ? (
-                <div className="p-5 text-zinc-500 text-sm">
-                  トレンドはまだありません
-                </div>
+                <div className="p-5 text-zinc-500 text-sm">トレンドはまだありません</div>
               ) : (
                 trends.map((trend, i) => (
                   <Link
@@ -401,20 +416,14 @@ export default function Layout({
                     href={`/search?q=${encodeURIComponent(trend.tag)}`}
                     className="block p-5 hover:bg-zinc-800 transition cursor-pointer border-t border-zinc-800 first:border-t-0"
                   >
-                    <div className="text-zinc-500 text-sm">
-                      トレンド · {trend.count}件
-                    </div>
-                    <div className="font-bold text-xl">
-                      {trend.tag}
-                    </div>
+                    <div className="text-zinc-500 text-sm">トレンド · {trend.count}件</div>
+                    <div className="font-bold text-xl">{trend.tag}</div>
                   </Link>
                 ))
               )}
             </div>
 
-            <div className="text-zinc-500 text-sm mt-4 px-2">
-              Critter v1.0.4
-            </div>
+            <div className="text-zinc-500 text-sm mt-4 px-2">Critter v1.0.3</div>
 
           </div>
         </div>
@@ -423,11 +432,8 @@ export default function Layout({
 
       {/* モバイル */}
       <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around py-3 md:hidden z-50">
-
         <Link href="/">🏠</Link>
-
         <Link href="/search">🔎</Link>
-
         <Link href="/notifications" className="relative">
           🔔
           {notificationCount > 0 && (
@@ -436,14 +442,75 @@ export default function Layout({
             </div>
           )}
         </Link>
-
         <Link href="/bookmarks">🔖</Link>
-
         <Link href={`/user/${currentUser?.uid}`}>👤</Link>
-
         <Link href="/settings">⚙️</Link>
-
       </div>
+
+      {/* アカウント切り替えモーダル */}
+      {switchTarget && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/70"
+            onClick={() => { setSwitchTarget(null); setPassword(""); setSwitchError(""); }}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="w-full max-w-sm bg-black border border-zinc-700 rounded-2xl shadow-2xl p-6">
+
+              {/* アカウント情報 */}
+              <div className="flex items-center gap-3 mb-5">
+                <img
+                  src={switchTarget.icon || "/default.png"}
+                  className="w-12 h-12 rounded-full object-cover bg-zinc-700"
+                />
+                <div>
+                  <div className="font-bold text-white">{switchTarget.name}</div>
+                  <div className="text-zinc-500 text-sm">@{switchTarget.username}</div>
+                </div>
+              </div>
+
+              <h2 className="font-bold text-white text-lg mb-1">パスワードを入力</h2>
+              <p className="text-zinc-500 text-sm mb-4">
+                アカウントを切り替えるにはパスワードが必要です
+              </p>
+
+              {/* パスワード入力 */}
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSwitch(); }}
+                placeholder="パスワード"
+                autoFocus
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition mb-3"
+              />
+
+              {/* エラー */}
+              {switchError && (
+                <p className="text-red-500 text-sm mb-3">{switchError}</p>
+              )}
+
+              {/* ボタン */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setSwitchTarget(null); setPassword(""); setSwitchError(""); }}
+                  className="flex-1 border border-zinc-700 py-2.5 rounded-full font-bold hover:bg-zinc-900 transition"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleSwitch}
+                  disabled={!password || switchLoading}
+                  className="flex-1 bg-white text-black py-2.5 rounded-full font-bold disabled:opacity-40 hover:bg-zinc-200 transition"
+                >
+                  {switchLoading ? "切り替え中..." : "切り替え"}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </>
+      )}
 
     </div>
 
