@@ -19,7 +19,9 @@ import {
   collection,
   query,
   where,
-  onSnapshot
+  onSnapshot,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 
 export default function Layout({
@@ -37,41 +39,41 @@ export default function Layout({
     setNotificationCount] =
     useState(0);
 
+  // トレンド（ハッシュタグ上位3件）
+  const [trends, setTrends] =
+    useState<{ tag: string; count: number }[]>([]);
+
+  // 通知バッジ
   useEffect(() => {
 
     if (!currentUser?.uid) return;
 
-    let personalUnsub: (() => void) | null = null;
-    let reportUnsub: (() => void) | null = null;
     let personalUnread = 0;
     let reportUnread = 0;
 
-    // 自分宛の通知（いいね・リポスト・引用・返信）
     const personalQ = query(
       collection(db, "notifications"),
       where("toUid", "==", currentUser.uid)
     );
 
-    personalUnsub = onSnapshot(personalQ, (snap) => {
+    const unsubPersonal = onSnapshot(personalQ, (snap) => {
 
       personalUnread = 0;
 
       snap.docs.forEach((d: any) => {
-
         const data = d.data();
         const readBy = data.readBy || [];
-
         if (!readBy.includes(currentUser.uid)) {
           personalUnread++;
         }
-
       });
 
       setNotificationCount(personalUnread + reportUnread);
 
     });
 
-    // 管理者なら通報通知も合算
+    let unsubReport: (() => void) | null = null;
+
     if (currentUser.admin) {
 
       const reportQ = query(
@@ -79,19 +81,16 @@ export default function Layout({
         where("type", "==", "report")
       );
 
-      reportUnsub = onSnapshot(reportQ, (snap) => {
+      unsubReport = onSnapshot(reportQ, (snap) => {
 
         reportUnread = 0;
 
         snap.docs.forEach((d: any) => {
-
           const data = d.data();
           const readBy = data.readBy || [];
-
           if (!readBy.includes(currentUser.uid)) {
             reportUnread++;
           }
-
         });
 
         setNotificationCount(personalUnread + reportUnread);
@@ -101,11 +100,57 @@ export default function Layout({
     }
 
     return () => {
-      if (personalUnsub) personalUnsub();
-      if (reportUnsub) reportUnsub();
+      unsubPersonal();
+      if (unsubReport) unsubReport();
     };
 
   }, [currentUser?.uid, currentUser?.admin]);
+
+  // トレンド集計（最新20投稿のハッシュタグ）
+  useEffect(() => {
+
+    const q = query(
+      collection(db, "posts"),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+
+      const tagCount: Record<string, number> = {};
+
+      snap.docs.forEach((d: any) => {
+
+        const data = d.data();
+        const text: string = data.text || "";
+
+        // テキストから #タグ を抽出
+        const tags = text.match(/#[^\s#]+/g) || [];
+
+        tags.forEach((tag) => {
+          const normalized = tag.toLowerCase();
+          tagCount[normalized] =
+            (tagCount[normalized] || 0) + 1;
+        });
+
+      });
+
+      // 出現回数順にソートして上位3件
+      const sorted = Object.entries(tagCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([tag, count]) => ({
+          tag: tag.slice(1), // # を除く
+          count,
+        }));
+
+      setTrends(sorted);
+
+    });
+
+    return () => unsub();
+
+  }, []);
 
   const menus = [
 
@@ -304,53 +349,41 @@ export default function Layout({
 
               </div>
 
-              <div className="p-5 hover:bg-zinc-800 transition cursor-pointer">
+              {trends.length === 0 ? (
 
-                <div className="text-zinc-500 text-sm">
+                <div className="p-5 text-zinc-500 text-sm">
 
-                  トレンド
-
-                </div>
-
-                <div className="font-bold text-xl">
-
-                  #AI
+                  トレンドはまだありません
 
                 </div>
 
-              </div>
+              ) : (
 
-              <div className="p-5 hover:bg-zinc-800 transition cursor-pointer">
+                trends.map((trend, i) => (
 
-                <div className="text-zinc-500 text-sm">
+                  <Link
+                    key={i}
+                    href={`/search?q=${encodeURIComponent(trend.tag)}`}
+                    className="block p-5 hover:bg-zinc-800 transition cursor-pointer border-t border-zinc-800 first:border-t-0"
+                  >
 
-                  ゲーム
+                    <div className="text-zinc-500 text-sm">
 
-                </div>
+                      トレンド · {trend.count}件
 
-                <div className="font-bold text-xl">
+                    </div>
 
-                  #Minecraft
+                    <div className="font-bold text-xl">
 
-                </div>
+                      #{trend.tag}
 
-              </div>
+                    </div>
 
-              <div className="p-5 hover:bg-zinc-800 transition cursor-pointer">
+                  </Link>
 
-                <div className="text-zinc-500 text-sm">
+                ))
 
-                  SNS
-
-                </div>
-
-                <div className="font-bold text-xl">
-
-                  #Critter
-
-                </div>
-
-              </div>
+              )}
 
             </div>
 
