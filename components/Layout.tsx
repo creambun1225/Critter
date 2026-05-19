@@ -188,7 +188,7 @@ function PostModal({
           {/* フッター */}
           <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800 shrink-0">
             <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-              🖼
+              画像を選択
               <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
             </label>
             <span className={`text-sm font-medium ${remaining < 0 ? "text-red-500" : remaining < 20 ? "text-yellow-500" : "text-zinc-500"}`}>
