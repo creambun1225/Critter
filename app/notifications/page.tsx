@@ -21,6 +21,7 @@ function notificationLabel(type: string) {
     case "repost": return { emoji: "🔁", text: "さんがリポストしました" };
     case "quote":  return { emoji: "✏️", text: "さんが引用リポストしました" };
     case "reply":  return { emoji: "💬", text: "さんが返信しました" };
+    case "follow": return { emoji: "👤", text: "さんにフォローされました" };
     case "report": return { emoji: "🚨", text: "クリートが通報されました" };
     default:       return { emoji: "🔔", text: "通知があります" };
   }
@@ -58,7 +59,6 @@ export default function NotificationsPage() {
         }
 
         setNotifications((prev) => {
-          // 通報通知と合算してcreatedAt降順
           const reports = prev.filter((n) => n.type === "report");
           return [...list, ...reports].sort((a, b) => b.createdAt - a.createdAt);
         });
@@ -133,14 +133,43 @@ export default function NotificationsPage() {
               );
             }
 
-            // 通常通知
+            // フォロー通知（投稿プレビューなし）
+            if (n.type === "follow") {
+              return (
+                <div key={n.id} className="border-b border-zinc-800 p-5 hover:bg-zinc-950 transition">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl shrink-0 mt-1">{emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        href={`/user/${n.fromUid}`}
+                        className="flex items-center gap-2 mb-1 w-fit hover:opacity-80 transition"
+                      >
+                        <img
+                          src={n.fromIcon || "/default.png"}
+                          className="w-9 h-9 rounded-full object-cover bg-zinc-700"
+                        />
+                        <span className="font-bold text-white">{n.fromName}</span>
+                        <span className="text-zinc-500 text-sm">@{n.fromUsername}</span>
+                      </Link>
+                      <p className="text-zinc-300 text-sm">
+                        <span className="font-bold text-white">{n.fromName}</span>
+                        {text}
+                      </p>
+                      <p className="text-zinc-600 text-xs mt-1">
+                        {new Date(n.createdAt).toLocaleString("ja-JP")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // 通常通知（いいね・リポスト・引用・返信）
             return (
               <div key={n.id} className="border-b border-zinc-800 p-5 hover:bg-zinc-950 transition">
                 <div className="flex items-start gap-3">
                   <span className="text-2xl shrink-0 mt-1">{emoji}</span>
                   <div className="flex-1 min-w-0">
-
-                    {/* アイコン + 名前 → プロフィールへ */}
                     <Link
                       href={`/user/${n.fromUid}`}
                       className="flex items-center gap-2 mb-1 w-fit hover:opacity-80 transition"
@@ -152,14 +181,10 @@ export default function NotificationsPage() {
                       <span className="font-bold text-white">{n.fromName}</span>
                       <span className="text-zinc-500 text-sm">@{n.fromUsername}</span>
                     </Link>
-
-                    {/* 通知文 */}
                     <p className="text-zinc-300 text-sm">
                       <span className="font-bold text-white">{n.fromName}</span>
                       {text}
                     </p>
-
-                    {/* 投稿プレビュー */}
                     {n.postText && (
                       <Link
                         href={`/post/${n.postId}`}
@@ -168,8 +193,6 @@ export default function NotificationsPage() {
                         {n.postText}
                       </Link>
                     )}
-
-                    {/* 時間 */}
                     <p className="text-zinc-600 text-xs mt-1">
                       {new Date(n.createdAt).toLocaleString("ja-JP")}
                     </p>
