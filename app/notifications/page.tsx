@@ -59,7 +59,7 @@ export default function NotificationsPage() {
         });
       });
 
-      // 管理者なら通報通知も取得
+      // 管理者のみ通報通知を取得
       if (userData.admin) {
         const reportQ = query(
           collection(db, "notifications"),
