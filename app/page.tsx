@@ -72,7 +72,10 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
           );
           setUsers(results.filter(Boolean));
         } else if (tab === "replies") {
-          const q = query(collection(db, "posts", post.id, "replies"), orderBy("createdAt", "asc"));
+          const q = query(
+            collection(db, "posts", post.id, "replies"),
+            orderBy("createdAt", "asc")
+          );
           const snap = await getDocs(q);
           const uids = [...new Set(snap.docs.map((d) => d.data().uid))] as string[];
           const results = await Promise.all(
@@ -96,14 +99,19 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
         <div className="w-full max-w-md bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
-            <button onClick={onClose} className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900">✕</button>
+            <button onClick={onClose}
+              className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900">
+              ✕
+            </button>
             <h2 className="font-bold text-white text-lg">アナリティクス</h2>
             <div className="w-10" />
           </div>
           <div className="flex border-b border-zinc-800 shrink-0">
             {tabs.map((t) => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                className={`flex-1 py-3 text-sm font-bold transition border-b-2 ${tab === t.key ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}>
+                className={`flex-1 py-3 text-sm font-bold transition border-b-2 ${
+                  tab === t.key ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"
+                }`}>
                 {t.label}
                 {t.count !== null && <span className="ml-1 text-xs text-zinc-500">({t.count})</span>}
               </button>
@@ -154,13 +162,10 @@ export default function Home() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // 5MB 制限
     if (file.size > 5 * 1024 * 1024) {
       alert("画像は5MB以下にしてください");
       return;
     }
-
     setImage(file);
     setImagePreview(URL.createObjectURL(file));
   };
@@ -188,20 +193,15 @@ export default function Home() {
     return () => unsub();
   }, []);
 
-  // 投稿
+  // 投稿（Layout のクリートボタンから呼ばれる可能性があるため残す）
   const createPost = async () => {
     if (!text.trim() && !image) return;
     if (posting) return;
     setPosting(true);
-
     try {
-      // 画像を Base64 に変換
       let imageUrl = "";
-      if (image) {
-        imageUrl = await fileToBase64(image);
-      }
+      if (image) imageUrl = await fileToBase64(image);
 
-      // スパム判定
       const now = Date.now();
       const spamQuery = query(
         collection(db, "posts"),
@@ -218,7 +218,6 @@ export default function Home() {
         return;
       }
 
-      // ハッシュタグ
       const hashtags = text.match(/#[^\s#]+/g)?.map((t) => t.slice(1)) || [];
 
       await addDoc(collection(db, "posts"), {
@@ -258,56 +257,6 @@ export default function Home() {
       {/* ヘッダー */}
       <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
         <div className="text-3xl md:text-4xl font-bold">ホーム</div>
-      </div>
-
-      {/* 投稿フォーム */}
-      <div className="border-b border-zinc-800 p-4 flex gap-4">
-        <img
-          src={userData?.icon || "/default.png"}
-          className="w-12 h-12 md:w-14 md:h-14 rounded-full object-cover bg-zinc-700 flex-shrink-0"
-        />
-        <div className="flex-1">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="いまどうしてる？"
-            className="w-full bg-black outline-none resize-none text-lg md:text-xl min-h-[120px] text-white placeholder-zinc-600"
-          />
-
-          {/* 画像プレビュー */}
-          {imagePreview && (
-            <div className="relative mt-3 inline-block">
-              <img src={imagePreview} className="rounded-2xl max-h-[350px] object-cover" />
-              <button
-                onClick={() => { setImage(null); setImagePreview(""); }}
-                className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between mt-4">
-            {/* 画像選択ボタン */}
-            <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-              画像を選択
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
-            </label>
-
-            <button
-              onClick={createPost}
-              disabled={posting || (!text.trim() && !image)}
-              className="bg-blue-500 hover:bg-blue-600 transition px-6 md:px-8 py-3 rounded-full text-lg font-bold disabled:opacity-40"
-            >
-              {posting ? "投稿中..." : "クリート"}
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* 投稿一覧 */}
