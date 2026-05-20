@@ -214,7 +214,7 @@ export default function Home() {
       );
       if (recentPosts.length >= 2) {
         for (const p of recentPosts) await deleteDoc(doc(db, "posts", p.id));
-        alert("同じクリートを3秒以内に3回行ったため削除しました");
+        alert("荒らし行為と判断し、クリートを削除しました");
         return;
       }
 
@@ -288,7 +288,7 @@ export default function Home() {
 
           <div className="flex items-center justify-between mt-4">
             <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-              🖼
+              画像を選択
               <input
                 type="file"
                 accept="image/*"
