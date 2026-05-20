@@ -193,7 +193,7 @@ export default function Home() {
     return () => unsub();
   }, []);
 
-  // 投稿（Layout のクリートボタンから呼ばれる可能性があるため残す）
+  // 投稿
   const createPost = async () => {
     if (!text.trim() && !image) return;
     if (posting) return;
@@ -257,6 +257,54 @@ export default function Home() {
       {/* ヘッダー */}
       <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
         <div className="text-3xl md:text-4xl font-bold">ホーム</div>
+      </div>
+
+      {/* 投稿フォーム（スマホのみ表示） */}
+      <div className="md:hidden border-b border-zinc-800 p-4 flex gap-4">
+        <img
+          src={userData?.icon || "/default.png"}
+          className="w-12 h-12 rounded-full object-cover bg-zinc-700 flex-shrink-0"
+        />
+        <div className="flex-1">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="いまどうしてる？"
+            className="w-full bg-black outline-none resize-none text-lg min-h-[120px] text-white placeholder-zinc-600"
+          />
+
+          {/* 画像プレビュー */}
+          {imagePreview && (
+            <div className="relative mt-3 inline-block">
+              <img src={imagePreview} className="rounded-2xl max-h-[350px] object-cover" />
+              <button
+                onClick={() => { setImage(null); setImagePreview(""); }}
+                className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-4">
+            <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
+              🖼
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </label>
+            <button
+              onClick={createPost}
+              disabled={posting || (!text.trim() && !image)}
+              className="bg-blue-500 hover:bg-blue-600 transition px-6 py-3 rounded-full text-lg font-bold disabled:opacity-40"
+            >
+              {posting ? "投稿中..." : "クリート"}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 投稿一覧 */}
