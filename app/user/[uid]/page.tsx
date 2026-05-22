@@ -205,6 +205,9 @@ export default function UserProfile() {
   const [followModal, setFollowModal] = useState<null | "followers" | "following">(null);
   const [analyticsPost, setAnalyticsPost] = useState<any>(null);
 
+  // 詳細メニュー（右上の⋯）
+  const [showMenu, setShowMenu] = useState(false);
+
   // ユーザー・フォロー情報取得
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -249,19 +252,16 @@ export default function UserProfile() {
     const myRef = doc(db, "users", me.uid);
 
     if (already) {
-      // フォロー解除
       await updateDoc(profileRef, { followers: arrayRemove(me.uid) });
       await updateDoc(myRef, { following: arrayRemove(uid) });
       setFollowers(followers.filter((id) => id !== me.uid));
       setFollowing(following.filter((id) => id !== uid));
     } else {
-      // フォロー
       await updateDoc(profileRef, { followers: arrayUnion(me.uid) });
       await updateDoc(myRef, { following: arrayUnion(uid) });
       setFollowers([...followers, me.uid]);
       setFollowing([...following, uid]);
 
-      // フォロー通知（自分へのフォローは除外）
       if (uid !== me.uid) {
         await addDoc(collection(db, "notifications"), {
           type: "follow",
@@ -277,6 +277,16 @@ export default function UserProfile() {
     }
   };
 
+  // 認証マーク付与 / 削除（管理者のみ）
+  const toggleVerified = async () => {
+    if (!currentUser?.admin) return;
+    const newVerified = !profile.verified;
+    await updateDoc(doc(db, "users", uid), { verified: newVerified });
+    setProfile((prev: any) => ({ ...prev, verified: newVerified }));
+    setShowMenu(false);
+    alert(newVerified ? "認証マークを付与しました" : "認証マークを削除しました");
+  };
+
   if (!profile) return null;
 
   const filteredPosts =
@@ -285,6 +295,11 @@ export default function UserProfile() {
       : posts.filter((p) => p.repostedUsers?.includes(uid));
 
   const followingList = profile.following || [];
+
+  // 自分のプロフィールか
+  const isMe = me?.uid === uid;
+  // 管理者か
+  const isAdmin = currentUser?.admin === true;
 
   return (
     <Layout currentUser={currentUser}>
@@ -295,34 +310,84 @@ export default function UserProfile() {
 
         {/* プロフィール情報 */}
         <div className="-mt-16 px-6">
-          <img
-            src={profile.icon || "/default.png"}
-            className="w-32 h-32 rounded-full border-4 border-black object-cover bg-zinc-700"
-          />
+          <div className="flex items-end justify-between">
+            <img
+              src={profile.icon || "/default.png"}
+              className="w-32 h-32 rounded-full border-4 border-black object-cover bg-zinc-700"
+            />
 
-          <div className="flex justify-between mt-5">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-3xl font-bold">{profile.name}</h1>
-                {profile.verified && <img src="/verified-blue.png" className="w-6 h-6" />}
-                {profile.admin && <img src="/verified-gold.png" className="w-6 h-6" />}
-              </div>
-              <div className="text-zinc-500">@{profile.username}</div>
+            {/* 右上のボタン群 */}
+            <div className="flex items-center gap-2 pb-2">
+
+              {/* 管理者用 詳細メニュー（⋯） */}
+              {isAdmin && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowMenu((p) => !p)}
+                    className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition"
+                  >
+                    ⋯
+                  </button>
+
+                  {showMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                      <div className="absolute right-0 top-12 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-52 z-50 shadow-2xl">
+                        <button
+                          onClick={toggleVerified}
+                          className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2"
+                        >
+                          {profile.verified ? (
+                            <>
+                              <img src="/verified-blue.png" className="w-5 h-5" />
+                              <span className="text-white font-bold text-sm">認証マークを削除</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-blue-400 text-lg">✓</span>
+                              <span className="text-white font-bold text-sm">認証マークを付与</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* フォローボタン / プロフィール編集 */}
+              {!isMe ? (
+                <button
+                  onClick={toggleFollow}
+                  className="bg-white text-black px-5 py-2 rounded-full font-bold hover:bg-zinc-200 transition"
+                >
+                  {followers.includes(me?.uid) ? "フォロー中" : "フォロー"}
+                </button>
+              ) : (
+                <Link href="/profile/edit">
+                  <button className="border border-zinc-700 px-5 py-2 rounded-full hover:bg-zinc-900 transition">
+                    プロフィール編集
+                  </button>
+                </Link>
+              )}
             </div>
+          </div>
 
-            {me?.uid !== uid && (
-              <button
-                onClick={toggleFollow}
-                className="bg-white text-black px-5 py-2 rounded-full font-bold hover:bg-zinc-200 transition"
-              >
-                {followers.includes(me?.uid) ? "フォロー中" : "フォロー"}
-              </button>
-            )}
+          {/* 名前・バッジ */}
+          <div className="mt-3">
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">{profile.name}</h1>
+              {/* 青バッジ：verified のみで判定（admin は関係なし） */}
+              {profile.verified && <img src="/verified-blue.png" className="w-6 h-6" />}
+              {/* 金バッジ：admin のみ */}
+              {profile.admin && <img src="/verified-gold.png" className="w-6 h-6" />}
+            </div>
+            <div className="text-zinc-500">@{profile.username}</div>
           </div>
 
           <p className="mt-5 text-white">{profile.bio}</p>
 
-          {/* フォロー数・フォロワー数（クリックでモーダル） */}
+          {/* フォロー数・フォロワー数 */}
           <div className="flex gap-8 mt-5">
             <button onClick={() => setFollowModal("following")} className="hover:underline text-left">
               <span className="font-bold text-white">{followingList.length}</span>
@@ -333,15 +398,6 @@ export default function UserProfile() {
               <span className="text-zinc-500 ml-1">フォロワー</span>
             </button>
           </div>
-
-          {/* プロフィール編集ボタン */}
-          {me?.uid === uid && (
-            <Link href="/profile/edit">
-              <button className="mt-5 border border-zinc-700 px-5 py-2 rounded-full hover:bg-zinc-900 transition">
-                プロフィール編集
-              </button>
-            </Link>
-          )}
         </div>
 
         {/* タブ */}
