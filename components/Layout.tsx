@@ -25,9 +25,9 @@ import {
   orderBy,
   limit,
   addDoc,
-  doc,
-  getDoc,
   getDocs,
+  getDoc,
+  doc,
 } from "firebase/firestore";
 
 import {
@@ -65,7 +65,6 @@ function PostModal({
     if (!currentUser || !canSubmit) return;
     setPosting(true);
     try {
-      // 画像をBase64に変換
       let imageUrl = "";
       if (image) {
         imageUrl = await new Promise<string>((resolve, reject) => {
@@ -88,13 +87,8 @@ function PostModal({
         icon: currentUser.icon || "",
         verified: currentUser.verified || false,
         admin: currentUser.admin || false,
-        replies: 0,
-        reposts: 0,
-        likes: 0,
-        bookmarks: 0,
-        likedUsers: [],
-        repostedUsers: [],
-        bookmarkedUsers: [],
+        replies: 0, reposts: 0, likes: 0, bookmarks: 0,
+        likedUsers: [], repostedUsers: [], bookmarkedUsers: [],
         createdAt: Date.now(),
       });
 
@@ -136,59 +130,36 @@ function PostModal({
       <div className="fixed inset-0 z-40 bg-black/70" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4">
         <div className="w-full max-w-lg bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
-
-          {/* ヘッダー */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
-            <button
-              onClick={onClose}
-              className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition"
-            >
+            <button onClick={onClose}
+              className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition">
               ✕
             </button>
-            <button
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm px-5 py-2 rounded-full disabled:opacity-40 transition"
-            >
+            <button onClick={handleSubmit} disabled={!canSubmit}
+              className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm px-5 py-2 rounded-full disabled:opacity-40 transition">
               {posting ? "投稿中..." : "クリート"}
             </button>
           </div>
-
-          {/* 入力エリア */}
           <div className="flex gap-3 p-4 overflow-y-auto flex-1">
-            <img
-              src={currentUser?.icon || "/default.png"}
-              className="w-11 h-11 rounded-full object-cover bg-zinc-700 shrink-0"
-            />
+            <img src={currentUser?.icon || "/default.png"} className="w-11 h-11 rounded-full object-cover bg-zinc-700 shrink-0" />
             <div className="flex-1 min-w-0">
-              <textarea
-                autoFocus
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="いまどうしてる？"
-                rows={5}
-                className="w-full bg-transparent text-white placeholder-zinc-600 resize-none outline-none text-xl leading-relaxed"
-              />
-
-              {/* 画像プレビュー */}
+              <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)}
+                placeholder="いまどうしてる？" rows={5}
+                className="w-full bg-transparent text-white placeholder-zinc-600 resize-none outline-none text-xl leading-relaxed" />
               {imagePreview && (
                 <div className="relative mt-3 inline-block">
                   <img src={imagePreview} className="rounded-2xl max-h-[250px] object-cover" />
-                  <button
-                    onClick={() => { setImage(null); setImagePreview(""); }}
-                    className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm"
-                  >
+                  <button onClick={() => { setImage(null); setImagePreview(""); }}
+                    className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm">
                     ✕
                   </button>
                 </div>
               )}
             </div>
           </div>
-
-          {/* フッター */}
           <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800 shrink-0">
             <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-              画像を選択
+              🖼
               <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
             </label>
             <span className={`text-sm font-medium ${remaining < 0 ? "text-red-500" : remaining < 20 ? "text-yellow-500" : "text-zinc-500"}`}>
@@ -220,6 +191,9 @@ export default function Layout({
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
 
+  // おすすめユーザー
+  const [recommendedUsers, setRecommendedUsers] = useState<any[]>([]);
+
   // パスワード入力モーダル
   const [switchTarget, setSwitchTarget] = useState<any>(null);
   const [password, setPassword] = useState("");
@@ -230,6 +204,23 @@ export default function Layout({
   const [savedAccounts, setSavedAccounts] = useState<
     { uid: string; name: string; username: string; icon: string; email: string }[]
   >([]);
+
+  // おすすめユーザー取得（@creambun と @critter_Official）
+  useEffect(() => {
+    const fetchRecommended = async () => {
+      const targets = ["creambun", "critter_Official"];
+      const results: any[] = [];
+      for (const username of targets) {
+        const q = query(collection(db, "users"), where("username", "==", username));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          results.push({ uid: snap.docs[0].id, ...snap.docs[0].data() });
+        }
+      }
+      setRecommendedUsers(results);
+    };
+    fetchRecommended();
+  }, []);
 
   // 保存済みアカウント読み込み
   useEffect(() => {
@@ -284,7 +275,6 @@ export default function Layout({
     location.href = "/login";
   };
 
-  // アカウント切り替えモーダルを開く
   const openSwitchModal = (account: any) => {
     setSwitchTarget(account);
     setPassword("");
@@ -292,7 +282,6 @@ export default function Layout({
     setShowAccountMenu(false);
   };
 
-  // アカウント切り替え実行
   const handleSwitch = async () => {
     if (!switchTarget || !password) return;
     setSwitchLoading(true);
@@ -323,10 +312,7 @@ export default function Layout({
     let personalUnread = 0;
     let reportUnread = 0;
 
-    const personalQ = query(
-      collection(db, "notifications"),
-      where("toUid", "==", currentUser.uid)
-    );
+    const personalQ = query(collection(db, "notifications"), where("toUid", "==", currentUser.uid));
     const unsubPersonal = onSnapshot(personalQ, (snap) => {
       personalUnread = 0;
       snap.docs.forEach((d: any) => {
@@ -400,25 +386,13 @@ export default function Layout({
 
         {/* 左 */}
         <div className="hidden md:flex w-[275px] h-screen sticky top-0 border-r border-zinc-800 px-4 py-3 flex-col">
-
-          {/* ロゴ */}
           <Link href="/" className="w-14 h-14 rounded-full hover:bg-zinc-900 flex items-center justify-center mb-4 overflow-hidden">
             <img src="/logo.png" className="w-full h-full object-cover" />
           </Link>
-
-          {/* メニュー */}
           <div className="flex flex-col gap-1">
             {menus.map((menu) => (
-              <Link
-                key={menu.href}
-                href={menu.href}
-                className={`
-                  flex items-center gap-5 px-5 py-4
-                  rounded-full text-2xl font-bold
-                  transition hover:bg-zinc-900
-                  ${pathname === menu.href ? "bg-zinc-900" : ""}
-                `}
-              >
+              <Link key={menu.href} href={menu.href}
+                className={`flex items-center gap-5 px-5 py-4 rounded-full text-2xl font-bold transition hover:bg-zinc-900 ${pathname === menu.href ? "bg-zinc-900" : ""}`}>
                 <div className="relative">
                   <span className="text-3xl">{menu.icon}</span>
                   {menu.href === "/notifications" && notificationCount > 0 && (
@@ -432,20 +406,14 @@ export default function Layout({
             ))}
           </div>
 
-          {/* クリートボタン → モーダルを開く */}
-          <button
-            onClick={() => setShowPostModal(true)}
-            className="mt-6 bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-xl font-bold"
-          >
+          <button onClick={() => setShowPostModal(true)}
+            className="mt-6 bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-xl font-bold">
             クリート
           </button>
 
-          {/* アカウントメニュー */}
           <div className="mt-auto relative" ref={menuRef}>
-
             {showAccountMenu && (
               <div className="absolute bottom-20 left-0 w-72 bg-black border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50">
-
                 <Link href={`/user/${currentUser?.uid}`} onClick={() => setShowAccountMenu(false)}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition">
                   <img src={currentUser?.icon || "/default.png"} className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0" />
@@ -455,7 +423,6 @@ export default function Layout({
                   </div>
                   <span className="text-blue-400 text-xl shrink-0">✓</span>
                 </Link>
-
                 {otherAccounts.map((account) => (
                   <button key={account.uid} onClick={() => openSwitchModal(account)}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition border-t border-zinc-800 w-full text-left">
@@ -466,20 +433,17 @@ export default function Layout({
                     </div>
                   </button>
                 ))}
-
                 <div className="border-t border-zinc-800" />
                 <Link href="/login" onClick={() => setShowAccountMenu(false)}
                   className="block px-4 py-3 hover:bg-zinc-900 transition text-white font-bold">
                   既存のアカウントを追加
                 </Link>
                 <div className="border-t border-zinc-800" />
-                <button onClick={handleLogout}
-                  className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition text-white font-bold">
+                <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition text-white font-bold">
                   @{currentUser?.username || "user"} からログアウト
                 </button>
               </div>
             )}
-
             <button onClick={() => setShowAccountMenu((prev) => !prev)}
               className="flex items-center gap-3 hover:bg-zinc-900 rounded-full p-3 transition w-full text-left">
               <img src={currentUser?.icon || "/default.png"} className="w-12 h-12 rounded-full object-cover bg-zinc-700 shrink-0" />
@@ -499,8 +463,11 @@ export default function Layout({
 
         {/* 右 */}
         <div className="hidden xl:block w-[350px] p-4">
-          <div className="sticky top-4">
-            <input placeholder="検索" className="w-full bg-zinc-900 rounded-full px-5 py-4 outline-none text-lg mb-4" />
+          <div className="sticky top-4 space-y-4">
+
+            <input placeholder="検索" className="w-full bg-zinc-900 rounded-full px-5 py-4 outline-none text-lg" />
+
+            {/* トレンド */}
             <div className="bg-zinc-900 rounded-3xl overflow-hidden">
               <div className="p-5 text-2xl font-bold border-b border-zinc-800">トレンド</div>
               {trends.length === 0 ? (
@@ -515,7 +482,52 @@ export default function Layout({
                 ))
               )}
             </div>
-            <div className="text-zinc-500 text-sm mt-4 px-2">Critter v1.0.5</div>
+
+            {/* おすすめユーザー */}
+            <div className="bg-zinc-900 rounded-3xl overflow-hidden">
+              <div className="p-5 text-xl font-bold border-b border-zinc-800">
+                おすすめユーザー
+              </div>
+              {recommendedUsers.length === 0 ? (
+                <div className="p-5 text-zinc-500 text-sm">読み込み中...</div>
+              ) : (
+                recommendedUsers.map((user) => (
+                  <Link
+                    key={user.uid}
+                    href={`/user/${user.uid}`}
+                    className="flex items-center gap-3 p-4 hover:bg-zinc-800 transition border-t border-zinc-800 first:border-t-0"
+                  >
+                    {/* アイコン */}
+                    <div className="relative shrink-0">
+                      <img
+                        src={user.icon || "/default.png"}
+                        className="w-12 h-12 rounded-full object-cover bg-zinc-700"
+                      />
+                    </div>
+
+                    {/* 情報 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className="font-bold text-white truncate">{user.name}</span>
+                        {user.verified && (
+                          <img src="/verified-blue.png" className="w-4 h-4 shrink-0" />
+                        )}
+                        {user.admin && (
+                          <img src="/verified-gold.png" className="w-4 h-4 shrink-0" />
+                        )}
+                      </div>
+                      <div className="text-zinc-500 text-sm truncate">@{user.username}</div>
+                      <div className="text-zinc-500 text-xs mt-0.5">
+                        フォロワー {(user.followers || []).length.toLocaleString()}人
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+
+            <div className="text-zinc-500 text-sm px-2">Critter v1.0.3</div>
+
           </div>
         </div>
 
@@ -540,10 +552,7 @@ export default function Layout({
 
       {/* 投稿モーダル */}
       {showPostModal && (
-        <PostModal
-          currentUser={currentUser}
-          onClose={() => setShowPostModal(false)}
-        />
+        <PostModal currentUser={currentUser} onClose={() => setShowPostModal(false)} />
       )}
 
       {/* アカウント切り替えモーダル */}
@@ -562,28 +571,18 @@ export default function Layout({
               </div>
               <h2 className="font-bold text-white text-lg mb-1">パスワードを入力</h2>
               <p className="text-zinc-500 text-sm mb-4">アカウントを切り替えるにはパスワードが必要です</p>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSwitch(); }}
-                placeholder="パスワード"
-                autoFocus
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition mb-3"
-              />
+                placeholder="パスワード" autoFocus
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition mb-3" />
               {switchError && <p className="text-red-500 text-sm mb-3">{switchError}</p>}
               <div className="flex gap-3">
-                <button
-                  onClick={() => { setSwitchTarget(null); setPassword(""); setSwitchError(""); }}
-                  className="flex-1 border border-zinc-700 py-2.5 rounded-full font-bold hover:bg-zinc-900 transition"
-                >
+                <button onClick={() => { setSwitchTarget(null); setPassword(""); setSwitchError(""); }}
+                  className="flex-1 border border-zinc-700 py-2.5 rounded-full font-bold hover:bg-zinc-900 transition">
                   キャンセル
                 </button>
-                <button
-                  onClick={handleSwitch}
-                  disabled={!password || switchLoading}
-                  className="flex-1 bg-white text-black py-2.5 rounded-full font-bold disabled:opacity-40 hover:bg-zinc-200 transition"
-                >
+                <button onClick={handleSwitch} disabled={!password || switchLoading}
+                  className="flex-1 bg-white text-black py-2.5 rounded-full font-bold disabled:opacity-40 hover:bg-zinc-200 transition">
                   {switchLoading ? "切り替え中..." : "切り替え"}
                 </button>
               </div>
