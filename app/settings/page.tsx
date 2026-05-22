@@ -220,9 +220,17 @@ export default function SettingsPage() {
 
         <Link
         href="/terms"
-        className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left"
+        className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4"
         >
           利用規約
+        </Link>
+
+        {/* プライバシーポリシー（利用規約の下に追加） */}
+        <Link
+        href="/privacy"
+        className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left"
+        >
+          プライバシーポリシー
         </Link>
 
       </div>
