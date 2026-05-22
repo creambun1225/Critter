@@ -457,7 +457,7 @@ export default function Layout({
               )}
             </div>
 
-            <div className="text-zinc-500 text-sm px-2">Critter v1.0.3</div>
+            <div className="text-zinc-500 text-sm px-2">Critter v1.0.5</div>
           </div>
         </div>
 
