@@ -303,24 +303,14 @@ export default function Layout({
     return () => unsub();
   }, []);
 
-  // メニュー定義（PNG アイコン使用）
+  // PC・モバイル共通メニュー定義
   const menus = [
-    { href: "/",                         icon: "/icon-home.png",         label: "ホーム" },
-    { href: "/search",                   icon: "/icon-search.png",       label: "検索" },
-    { href: "/notifications",            icon: "/icon-notification.png", label: "通知" },
-    { href: `/user/${currentUser?.uid}`, icon: "/icon-profile.png",      label: "プロフィール" },
-    { href: "/bookmarks",                icon: "/icon-bookmarks.png",    label: "ブックマーク" },
-    { href: "/settings",                 icon: "/icon-settings.png",     label: "設定" },
-  ];
-
-  // モバイル用メニュー（絵文字のまま）
-  const mobileMenus = [
-    { href: "/",                         emoji: "🏠" },
-    { href: "/search",                   emoji: "🔎" },
-    { href: "/notifications",            emoji: "🔔", badge: true },
-    { href: "/bookmarks",                emoji: "🔖" },
-    { href: `/user/${currentUser?.uid}`, emoji: "👤" },
-    { href: "/settings",                 emoji: "⚙️" },
+    { href: "/",                         icon: "/icon-home.png",         label: "ホーム",         badge: false },
+    { href: "/search",                   icon: "/icon-search.png",       label: "検索",           badge: false },
+    { href: "/notifications",            icon: "/icon-notification.png", label: "通知",           badge: true  },
+    { href: `/user/${currentUser?.uid}`, icon: "/icon-profile.png",      label: "プロフィール",   badge: false },
+    { href: "/bookmarks",                icon: "/icon-bookmarks.png",    label: "ブックマーク",   badge: false },
+    { href: "/settings",                 icon: "/icon-settings.png",     label: "設定",           badge: false },
   ];
 
   const otherAccounts = savedAccounts.filter((a) => a.uid !== currentUser?.uid);
@@ -329,7 +319,7 @@ export default function Layout({
     <div className="bg-black text-white min-h-screen flex justify-center overflow-x-hidden">
       <div className="w-full max-w-7xl flex">
 
-        {/* 左メニュー */}
+        {/* 左メニュー（PC） */}
         <div className="hidden md:flex w-[275px] h-screen sticky top-0 border-r border-zinc-800 px-4 py-3 flex-col">
 
           <Link href="/" className="w-14 h-14 rounded-full hover:bg-zinc-900 flex items-center justify-center mb-4 overflow-hidden">
@@ -341,14 +331,8 @@ export default function Layout({
               <Link key={menu.href} href={menu.href}
                 className={`flex items-center gap-5 px-5 py-4 rounded-full text-2xl font-bold transition hover:bg-zinc-900 ${pathname === menu.href ? "bg-zinc-900" : ""}`}>
                 <div className="relative w-8 h-8 shrink-0">
-                  {/* PNG アイコン */}
-                  <img
-                    src={menu.icon}
-                    alt={menu.label}
-                    className="w-8 h-8 object-contain"
-                  />
-                  {/* 通知バッジ */}
-                  {menu.href === "/notifications" && notificationCount > 0 && (
+                  <img src={menu.icon} alt={menu.label} className="w-8 h-8 object-contain" />
+                  {menu.badge && notificationCount > 0 && (
                     <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs min-w-[20px] h-5 px-1 rounded-full flex items-center justify-center font-bold">
                       {notificationCount > 99 ? "99+" : notificationCount}
                     </div>
@@ -457,19 +441,19 @@ export default function Layout({
               )}
             </div>
 
-            <div className="text-zinc-500 text-sm px-2">Critter v1.0.5</div>
+            <div className="text-zinc-500 text-sm px-2">Critter v1.0.3</div>
           </div>
         </div>
 
       </div>
 
-      {/* モバイル下メニュー（絵文字のまま） */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around py-3 md:hidden z-50">
-        {mobileMenus.map((m) => (
-          <Link key={m.href} href={m.href} className="relative">
-            {m.emoji}
-            {m.badge && notificationCount > 0 && (
-              <div className="absolute -top-2 -right-3 bg-blue-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center font-bold">
+      {/* モバイル下メニュー（PNG アイコン） */}
+      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around items-center py-3 md:hidden z-50">
+        {menus.map((menu) => (
+          <Link key={menu.href} href={menu.href} className="relative flex items-center justify-center w-10 h-10">
+            <img src={menu.icon} alt={menu.label} className="w-6 h-6 object-contain" />
+            {menu.badge && notificationCount > 0 && (
+              <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-[10px] min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center font-bold">
                 {notificationCount > 99 ? "99+" : notificationCount}
               </div>
             )}
