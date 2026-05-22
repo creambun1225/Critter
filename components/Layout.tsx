@@ -267,23 +267,38 @@ export default function Layout({
     let personalUnread = 0;
     let reportUnread = 0;
 
-    const personalQ = query(collection(db, "notifications"), where("toUid", "==", currentUser.uid));
+    const personalQ = query(
+      collection(db, "notifications"),
+      where("toUid", "==", currentUser.uid)
+    );
     const unsubPersonal = onSnapshot(personalQ, (snap) => {
       personalUnread = 0;
-      snap.docs.forEach((d: any) => { if (!(d.data().readBy || []).includes(currentUser.uid)) personalUnread++; });
+      snap.docs.forEach((d: any) => {
+        const readBy: string[] = d.data().readBy || [];
+        if (!readBy.includes(currentUser.uid)) personalUnread++;
+      });
       setNotificationCount(personalUnread + reportUnread);
     });
 
     let unsubReport: (() => void) | null = null;
     if (currentUser.admin) {
-      const reportQ = query(collection(db, "notifications"), where("type", "==", "report"));
+      const reportQ = query(
+        collection(db, "notifications"),
+        where("type", "==", "report")
+      );
       unsubReport = onSnapshot(reportQ, (snap) => {
         reportUnread = 0;
-        snap.docs.forEach((d: any) => { if (!(d.data().readBy || []).includes(currentUser.uid)) reportUnread++; });
+        snap.docs.forEach((d: any) => {
+          const readBy: string[] = d.data().readBy || [];
+          if (!readBy.includes(currentUser.uid)) reportUnread++;
+        });
         setNotificationCount(personalUnread + reportUnread);
       });
     }
-    return () => { unsubPersonal(); if (unsubReport) unsubReport(); };
+    return () => {
+      unsubPersonal();
+      if (unsubReport) unsubReport();
+    };
   }, [currentUser?.uid, currentUser?.admin]);
 
   // トレンド集計
@@ -303,26 +318,26 @@ export default function Layout({
     return () => unsub();
   }, []);
 
-  // PC・モバイル共通メニュー定義
   const menus = [
-    { href: "/",                         icon: "/icon-home.png",         label: "ホーム",         badge: false },
-    { href: "/search",                   icon: "/icon-search.png",       label: "検索",           badge: false },
-    { href: "/notifications",            icon: "/icon-notification.png", label: "通知",           badge: true  },
-    { href: `/user/${currentUser?.uid}`, icon: "/icon-profile.png",      label: "プロフィール",   badge: false },
-    { href: "/bookmarks",                icon: "/icon-bookmarks.png",    label: "ブックマーク",   badge: false },
-    { href: "/settings",                 icon: "/icon-settings.png",     label: "設定",           badge: false },
+    { href: "/",                         icon: "/icon-home.png",         label: "ホーム",       badge: false },
+    { href: "/search",                   icon: "/icon-search.png",       label: "検索",         badge: false },
+    { href: "/notifications",            icon: "/icon-notification.png", label: "通知",         badge: true  },
+    { href: `/user/${currentUser?.uid}`, icon: "/icon-profile.png",      label: "プロフィール", badge: false },
+    { href: "/bookmarks",                icon: "/icon-bookmarks.png",    label: "ブックマーク", badge: false },
+    { href: "/settings",                 icon: "/icon-settings.png",     label: "設定",         badge: false },
   ];
 
   const otherAccounts = savedAccounts.filter((a) => a.uid !== currentUser?.uid);
 
   return (
-    <div className="bg-black text-white min-h-screen flex justify-center overflow-x-hidden">
-      <div className="w-full max-w-7xl flex">
+    // ── 全体: 画面高さに固定・横スクロール禁止
+    <div className="bg-black text-white h-screen flex justify-center overflow-hidden">
+      <div className="w-full max-w-7xl flex h-full">
 
-        {/* 左メニュー（PC） */}
-        <div className="hidden md:flex w-[275px] h-screen sticky top-0 border-r border-zinc-800 px-4 py-3 flex-col">
+        {/* 左メニュー（固定・スクロールしない） */}
+        <div className="hidden md:flex w-[275px] h-full flex-col border-r border-zinc-800 px-4 py-3 flex-shrink-0">
 
-          <Link href="/" className="w-14 h-14 rounded-full hover:bg-zinc-900 flex items-center justify-center mb-4 overflow-hidden">
+          <Link href="/" className="w-14 h-14 rounded-full hover:bg-zinc-900 flex items-center justify-center mb-4 overflow-hidden shrink-0">
             <img src="/logo.png" className="w-full h-full object-cover" />
           </Link>
 
@@ -332,8 +347,9 @@ export default function Layout({
                 className={`flex items-center gap-5 px-5 py-4 rounded-full text-2xl font-bold transition hover:bg-zinc-900 ${pathname === menu.href ? "bg-zinc-900" : ""}`}>
                 <div className="relative w-8 h-8 shrink-0">
                   <img src={menu.icon} alt={menu.label} className="w-8 h-8 object-contain" />
+                  {/* 通知バッジ：数字を表示 */}
                   {menu.badge && notificationCount > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs min-w-[20px] h-5 px-1 rounded-full flex items-center justify-center font-bold">
+                    <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center font-bold leading-none">
                       {notificationCount > 99 ? "99+" : notificationCount}
                     </div>
                   )}
@@ -344,7 +360,7 @@ export default function Layout({
           </div>
 
           <button onClick={() => setShowPostModal(true)}
-            className="mt-6 bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-xl font-bold">
+            className="mt-6 bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-xl font-bold shrink-0">
             クリート
           </button>
 
@@ -391,14 +407,14 @@ export default function Layout({
           </div>
         </div>
 
-        {/* 真ん中 */}
-        <main className="flex-1 border-r border-l border-zinc-800 min-h-screen max-w-[700px] w-full">
+        {/* 真ん中（ここだけスクロール） */}
+        <main className="flex-1 border-r border-l border-zinc-800 h-full overflow-y-auto max-w-[700px] w-full">
           {children}
         </main>
 
-        {/* 右 */}
-        <div className="hidden xl:block w-[350px] p-4">
-          <div className="sticky top-4 space-y-4">
+        {/* 右（固定・スクロールしない） */}
+        <div className="hidden xl:flex flex-col w-[350px] h-full flex-shrink-0 p-4 overflow-y-auto">
+          <div className="space-y-4">
             <input placeholder="検索" className="w-full bg-zinc-900 rounded-full px-5 py-4 outline-none text-lg" />
 
             {/* トレンド */}
@@ -441,19 +457,19 @@ export default function Layout({
               )}
             </div>
 
-            <div className="text-zinc-500 text-sm px-2">Critter v1.0.5</div>
+            <div className="text-zinc-500 text-sm px-2">Critter v1.0.3</div>
           </div>
         </div>
 
       </div>
 
-      {/* モバイル下メニュー（PNG アイコン） */}
+      {/* モバイル下メニュー */}
       <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around items-center py-3 md:hidden z-50">
         {menus.map((menu) => (
           <Link key={menu.href} href={menu.href} className="relative flex items-center justify-center w-10 h-10">
             <img src={menu.icon} alt={menu.label} className="w-6 h-6 object-contain" />
             {menu.badge && notificationCount > 0 && (
-              <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-[10px] min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center font-bold">
+              <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-[10px] min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center font-bold leading-none">
                 {notificationCount > 99 ? "99+" : notificationCount}
               </div>
             )}
