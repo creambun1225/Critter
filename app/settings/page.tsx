@@ -51,7 +51,7 @@ export default function SettingsPage() {
           setCurrentUser(user);
 
           const snap = await getDoc(
-            doc(db,"users",user.uid)
+            doc(db, "users", user.uid)
           );
 
           if (snap.exists()) {
@@ -67,16 +67,16 @@ export default function SettingsPage() {
 
   const logout = async () => {
     await signOut(auth);
-    location.href="/login";
+    location.href = "/login";
   };
 
   const changePassword = async () => {
 
-    if(!newPassword)return;
+    if (!newPassword) return;
 
-    try{
+    try {
 
-      if(auth.currentUser){
+      if (auth.currentUser) {
 
         await updatePassword(
           auth.currentUser,
@@ -88,7 +88,7 @@ export default function SettingsPage() {
 
       }
 
-    }catch{
+    } catch {
 
       alert("再ログインしてください");
 
@@ -96,18 +96,18 @@ export default function SettingsPage() {
 
   };
 
-  const becomeAdmin=async()=>{
+  const becomeAdmin = async () => {
 
-    if(adminPassword!=="annpannmann"){
+    if (adminPassword !== "annpannmann") {
       alert("パスワードが違います");
       return;
     }
 
     await updateDoc(
-      doc(db,"users",currentUser.uid),
+      doc(db, "users", currentUser.uid),
       {
-        admin:true,
-        verified:true
+        admin: true,
+        verified: true
       }
     );
 
@@ -116,25 +116,23 @@ export default function SettingsPage() {
 
   };
 
-  const removeAccount=async()=>{
+  const removeAccount = async () => {
 
-    const ok=confirm(
-      "本当に削除しますか？"
-    );
+    const ok = confirm("本当に削除しますか？");
 
-    if(!ok)return;
+    if (!ok) return;
 
-    await deleteUser(
-      auth.currentUser!
-    );
+    await deleteUser(auth.currentUser!);
 
   };
 
-  if(!currentUser)return null;
+  if (!currentUser) return null;
 
-  return(
+  const isAdmin = userData?.admin === true;
 
-    <Layout currentUser={{...currentUser,...userData}}>
+  return (
+
+    <Layout currentUser={{ ...currentUser, ...userData }}>
 
       <div className="p-6 text-white">
 
@@ -143,99 +141,75 @@ export default function SettingsPage() {
         </h1>
 
         <div className="bg-zinc-900 rounded-2xl p-5 mb-6">
-
-          <div className="text-xl font-bold mb-4">
-            アカウント情報
-          </div>
-
-          <div>
-            名前: {userData?.name}
-          </div>
-
-          <div className="text-zinc-500 mt-2">
-            @{userData?.username}
-          </div>
-
+          <div className="text-xl font-bold mb-4">アカウント情報</div>
+          <div>名前: {userData?.name}</div>
+          <div className="text-zinc-500 mt-2">@{userData?.username}</div>
         </div>
 
         <div className="bg-zinc-900 rounded-2xl p-5 mb-6">
-
-          <div className="text-xl font-bold mb-4">
-            パスワード変更
-          </div>
-
+          <div className="text-xl font-bold mb-4">パスワード変更</div>
           <input
-          type="password"
-          value={newPassword}
-          onChange={(e)=>setNewPassword(e.target.value)}
-          placeholder="新しいパスワード"
-          className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-4"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="新しいパスワード"
+            className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-4"
           />
-
-          <button
-          onClick={changePassword}
-          className="bg-blue-500 px-5 py-3 rounded-xl"
-          >
+          <button onClick={changePassword} className="bg-blue-500 px-5 py-3 rounded-xl">
             変更する
           </button>
-
         </div>
 
         <div className="bg-zinc-900 rounded-2xl p-5 mb-6">
-
-          <div className="text-xl font-bold mb-4">
-            管理者権限付与
-          </div>
-
+          <div className="text-xl font-bold mb-4">管理者権限付与</div>
           <input
-          type="password"
-          value={adminPassword}
-          onChange={(e)=>setAdminPassword(e.target.value)}
-          placeholder="管理者パスワード"
-          className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-4"
+            type="password"
+            value={adminPassword}
+            onChange={(e) => setAdminPassword(e.target.value)}
+            placeholder="管理者パスワード"
+            className="w-full bg-black border border-zinc-700 rounded-xl p-3 mb-4"
           />
-
-          <button
-          onClick={becomeAdmin}
-          className="bg-yellow-500 text-black px-5 py-3 rounded-xl"
-          >
+          <button onClick={becomeAdmin} className="bg-yellow-500 text-black px-5 py-3 rounded-xl">
             管理者になる
           </button>
-
         </div>
 
-        <button
-        onClick={logout}
-        className="w-full bg-zinc-800 rounded-xl p-4 mb-4"
-        >
+        <button onClick={logout} className="w-full bg-zinc-800 rounded-xl p-4 mb-4">
           ログアウト
         </button>
 
-        <button
-        onClick={removeAccount}
-        className="w-full bg-red-600 rounded-xl p-4 mb-4"
-        >
+        <button onClick={removeAccount} className="w-full bg-red-600 rounded-xl p-4 mb-4">
           アカウント削除
         </button>
 
-        <Link
-        href="/terms"
-        className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4"
-        >
+        <Link href="/terms" className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4">
           利用規約
         </Link>
 
-        {/* プライバシーポリシー（利用規約の下に追加） */}
-        <Link
-        href="/privacy"
-        className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left"
-        >
+        <Link href="/privacy" className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4">
           プライバシーポリシー
         </Link>
+
+        {/* お問い合わせ */}
+        <Link href="/contact" className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4">
+          お問い合わせ
+        </Link>
+
+        {/* バグ報告 */}
+        <Link href="/bugreport" className="w-full block bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl p-4 text-left mb-4">
+          バグ報告
+        </Link>
+
+        {/* 管理者のみ：報告一覧 */}
+        {isAdmin && (
+          <Link href="/admin/reports" className="w-full block bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/40 rounded-xl p-4 text-left text-yellow-400 font-bold">
+            📋 報告一覧（管理者）
+          </Link>
+        )}
 
       </div>
 
     </Layout>
 
-  )
+  );
 }
