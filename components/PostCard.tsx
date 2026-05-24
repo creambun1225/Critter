@@ -30,7 +30,6 @@ function PostText({
   const router = useRouter();
   if (!text) return null;
 
-  // #タグ と @メンション を同時にパース
   const parts = text.split(/(#[^\s#]+|@[a-zA-Z0-9_]+)/g);
 
   const handleMentionClick = async (
@@ -39,18 +38,10 @@ function PostText({
   ) => {
     e.preventDefault();
     e.stopPropagation();
-
-    // username からユーザーを検索してプロフィールへ
     try {
-      const q = query(
-        collection(db, "users"),
-        where("username", "==", username)
-      );
+      const q = query(collection(db, "users"), where("username", "==", username));
       const snap = await getDocs(q);
-      if (!snap.empty) {
-        const uid = snap.docs[0].id;
-        router.push(`/user/${uid}`);
-      }
+      if (!snap.empty) router.push(`/user/${snap.docs[0].id}`);
     } catch (e) {
       console.error(e);
     }
@@ -59,38 +50,25 @@ function PostText({
   return (
     <span className="whitespace-pre-wrap break-words text-[16px] text-white">
       {parts.map((part, i) => {
-        // ハッシュタグ
         if (/^#[^\s#]+/.test(part)) {
           const word = part.slice(1);
           return (
-            <span
-              key={i}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                router.push(`/search?q=${encodeURIComponent(word)}`);
-              }}
-              className="text-blue-400 hover:underline cursor-pointer"
-            >
+            <span key={i}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/search?q=${encodeURIComponent(word)}`); }}
+              className="text-blue-400 hover:underline cursor-pointer">
               {part}
             </span>
           );
         }
-
-        // メンション
         if (/^@[a-zA-Z0-9_]+/.test(part)) {
           const username = part.slice(1);
           return (
-            <span
-              key={i}
-              onClick={(e) => handleMentionClick(e, username)}
-              className="text-blue-400 hover:underline cursor-pointer"
-            >
+            <span key={i} onClick={(e) => handleMentionClick(e, username)}
+              className="text-blue-400 hover:underline cursor-pointer">
               {part}
             </span>
           );
         }
-
         return <span key={i}>{part}</span>;
       })}
     </span>
@@ -112,11 +90,8 @@ function QuotePostCard({ post }: { post: any }) {
     ? post.createdAt.toDate()
     : new Date(post.createdAt ?? Date.now());
   return (
-    <Link
-      href={`/post/${post.id}`}
-      onClick={(e) => e.stopPropagation()}
-      className="block border border-zinc-700 rounded-xl p-3 mt-3 hover:bg-zinc-900 transition"
-    >
+    <Link href={`/post/${post.id}`} onClick={(e) => e.stopPropagation()}
+      className="block border border-zinc-700 rounded-xl p-3 mt-3 hover:bg-zinc-900 transition">
       <div className="flex items-center gap-2 flex-wrap mb-1">
         <img src={post.icon || "/default.png"} className="w-5 h-5 rounded-full object-cover bg-zinc-700" />
         <span className="font-bold text-white text-sm">{post.name}</span>
@@ -136,7 +111,7 @@ function QuotePostCard({ post }: { post: any }) {
 }
 
 // ───────────────────────────────────────
-// リポスト選択モーダル
+// リクリート選択モーダル
 // ───────────────────────────────────────
 function RepostModal({
   isReposted, onClose, onRepost, onQuote,
@@ -241,7 +216,6 @@ function QuoteModal({
         });
       }
 
-      // メンション通知
       await sendMentionNotifications(text, currentUser);
 
       onClose();
@@ -293,23 +267,16 @@ function QuoteModal({
 }
 
 // ───────────────────────────────────────
-// メンション通知送信（共通ユーティリティ）
+// メンション通知送信
 // ───────────────────────────────────────
 async function sendMentionNotifications(text: string, currentUser: any) {
   const mentions = text.match(/@([a-zA-Z0-9_]+)/g);
   if (!mentions) return;
-
   const usernames = [...new Set(mentions.map((m) => m.slice(1)))];
-
   for (const username of usernames) {
-    // 自分自身へのメンションは除外
     if (username === currentUser.username) continue;
-
     try {
-      const q = query(
-        collection(db, "users"),
-        where("username", "==", username)
-      );
+      const q = query(collection(db, "users"), where("username", "==", username));
       const snap = await getDocs(q);
       if (!snap.empty) {
         const targetUid = snap.docs[0].id;
@@ -348,6 +315,14 @@ export default function PostCard({
   const isBookmarked = post.bookmarkedUsers?.includes(currentUser?.uid);
   const isOwner = currentUser?.uid === post.uid;
   const canDelete = isOwner || currentUser?.admin;
+
+  // インプレッション数（エンゲージメント合計）
+  const impressions =
+    (post.likes || 0) +
+    (post.reposts || 0) +
+    (post.replies || 0) +
+    (post.bookmarks || 0) +
+    (post.impressions || 0);
 
   // 通報
   const reportPost = async () => {
@@ -403,7 +378,7 @@ export default function PostCard({
     }
   };
 
-  // リポスト（通常）
+  // リクリート（通常）
   const repostPost = async () => {
     if (!currentUser) return;
     const repostedUsers = post.repostedUsers || [];
@@ -475,7 +450,7 @@ export default function PostCard({
               </div>
             )}
 
-            {/* 本文（ハッシュタグ・メンション青リンク） */}
+            {/* 本文 */}
             <Link href={`/post/${post.id}`} className="block mt-2"
               onClick={(e) => {
                 const target = e.target as HTMLElement;
@@ -498,10 +473,12 @@ export default function PostCard({
             {/* アクションボタン */}
             <div className="flex justify-between mt-5 max-w-md text-zinc-500">
 
+              {/* 💬 リプライ */}
               <Link href={`/post/${post.id}`} className="hover:text-sky-400 flex items-center gap-2 transition">
                 <span>💬</span><span>{post.replies || 0}</span>
               </Link>
 
+              {/* 🔁 リクリート */}
               <div className="relative">
                 <button onClick={(e) => { e.preventDefault(); setShowRepostModal((p) => !p); }}
                   className={`flex items-center gap-2 transition ${isReposted ? "text-green-400" : "hover:text-green-400"}`}>
@@ -513,15 +490,23 @@ export default function PostCard({
                 )}
               </div>
 
+              {/* ❤️ いいね */}
               <button onClick={(e) => { e.preventDefault(); likePost(); }}
                 className={`flex items-center gap-2 transition ${isLiked ? "text-pink-400" : "hover:text-pink-400"}`}>
                 <span>❤️</span><span>{post.likes || 0}</span>
               </button>
 
+              {/* 🔖 ブックマーク */}
               <button onClick={(e) => { e.preventDefault(); bookmarkPost(); }}
                 className={`flex items-center gap-2 transition ${isBookmarked ? "text-yellow-400" : "hover:text-yellow-400"}`}>
                 <span>🔖</span><span>{post.bookmarks || 0}</span>
               </button>
+
+              {/* 📊 インプレッション（ブックマークの右） */}
+              <span className="flex items-center gap-1.5 text-zinc-600 text-sm select-none">
+                <span>📊</span>
+                <span>{impressions.toLocaleString()}</span>
+              </span>
 
             </div>
           </div>
@@ -536,7 +521,7 @@ export default function PostCard({
                 <>
                   <button onClick={() => { onAnalytics(post); setOpen(false); }}
                     className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-white flex items-center gap-2">
-                    <span></span><span>アナリティクス</span>
+                    <span>📊</span><span>アナリティクス</span>
                   </button>
                   <div className="border-t border-zinc-800" />
                 </>

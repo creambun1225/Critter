@@ -1,18 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  collection,
-  addDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  doc,
-  getDoc,
-  where,
-  getDocs,
-  deleteDoc,
+  collection, addDoc, query, orderBy,
+  onSnapshot, doc, getDoc, where,
+  getDocs, deleteDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
@@ -40,10 +33,10 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
 
   const tabs = [
-    { key: "likes",   label: "いいね",   count: post.likedUsers?.length || 0 },
-    { key: "reposts", label: "リクリート", count: post.repostedUsers?.length || 0 },
-    { key: "quotes",  label: "引用リクリート",     count: null },
-    { key: "replies", label: "リプライ", count: post.replies || 0 },
+    { key: "likes",   label: "いいね",        count: post.likedUsers?.length || 0 },
+    { key: "reposts", label: "リクリート",     count: post.repostedUsers?.length || 0 },
+    { key: "quotes",  label: "引用リクリート", count: null },
+    { key: "replies", label: "リプライ",       count: post.replies || 0 },
   ] as const;
 
   useEffect(() => {
@@ -72,10 +65,7 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
           );
           setUsers(results.filter(Boolean));
         } else if (tab === "replies") {
-          const q = query(
-            collection(db, "posts", post.id, "replies"),
-            orderBy("createdAt", "asc")
-          );
+          const q = query(collection(db, "posts", post.id, "replies"), orderBy("createdAt", "asc"));
           const snap = await getDocs(q);
           const uids = [...new Set(snap.docs.map((d) => d.data().uid))] as string[];
           const results = await Promise.all(
@@ -99,19 +89,14 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
         <div className="w-full max-w-md bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
-            <button onClick={onClose}
-              className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900">
-              ✕
-            </button>
+            <button onClick={onClose} className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900">✕</button>
             <h2 className="font-bold text-white text-lg">アナリティクス</h2>
             <div className="w-10" />
           </div>
           <div className="flex border-b border-zinc-800 shrink-0">
             {tabs.map((t) => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                className={`flex-1 py-3 text-sm font-bold transition border-b-2 ${
-                  tab === t.key ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"
-                }`}>
+                className={`flex-1 py-3 text-sm font-bold transition border-b-2 ${tab === t.key ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}>
                 {t.label}
                 {t.count !== null && <span className="ml-1 text-xs text-zinc-500">({t.count})</span>}
               </button>
@@ -146,6 +131,41 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
 }
 
 // ───────────────────────────────────────
+// おすすめスコア計算
+// ───────────────────────────────────────
+function calcRecommendScore(post: any, currentUser: any): number {
+  let score = 0;
+
+  // いいね数・リポスト数・リプライ数・ブックマーク数
+  score += (post.likes || 0) * 3;
+  score += (post.reposts || 0) * 4;
+  score += (post.replies || 0) * 2;
+  score += (post.bookmarks || 0) * 2;
+
+  // 自分がいいねしているユーザーの投稿を優遇
+  if (currentUser?.likedUsers && post.likedUsers) {
+    const likedByMe = post.likedUsers.includes(currentUser.uid);
+    if (!likedByMe) {
+      // 自分がいいねした投稿者かどうか
+      score += 5;
+    }
+  }
+
+  // フォロー中ユーザーの投稿を少し優遇
+  const following: string[] = currentUser?.following || [];
+  if (following.includes(post.uid)) score += 8;
+
+  // 新しい投稿を優遇（最大10点、24時間以内）
+  const age = Date.now() - (post.createdAt || 0);
+  const hoursOld = age / (1000 * 60 * 60);
+  if (hoursOld < 1) score += 10;
+  else if (hoursOld < 6) score += 7;
+  else if (hoursOld < 24) score += 3;
+
+  return score;
+}
+
+// ───────────────────────────────────────
 // ホームページ
 // ───────────────────────────────────────
 export default function Home() {
@@ -158,14 +178,14 @@ export default function Home() {
   const [analyticsPost, setAnalyticsPost] = useState<any>(null);
   const [posting, setPosting] = useState(false);
 
+  // タブ: "following" | "recommended" | "latest"
+  const [feedTab, setFeedTab] = useState<"following" | "recommended" | "latest">("recommended");
+
   // 画像選択
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert("画像は5MB以下にしてください");
-      return;
-    }
+    if (file.size > 5 * 1024 * 1024) { alert("画像は5MB以下にしてください"); return; }
     setImage(file);
     setImagePreview(URL.createObjectURL(file));
   };
@@ -184,7 +204,7 @@ export default function Home() {
     return () => unsub();
   }, []);
 
-  // 投稿取得
+  // 投稿取得（全件 → タブで絞り込み）
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
@@ -192,6 +212,36 @@ export default function Home() {
     });
     return () => unsub();
   }, []);
+
+  // タブ別に投稿を絞り込み・ソート
+  const displayPosts = useMemo(() => {
+    if (!currentUser) return posts;
+
+    const following: string[] = currentUser.following || [];
+    const mutedUsers: string[] = currentUser.mutedUsers || [];
+    const blockedUsers: string[] = currentUser.blockedUsers || [];
+
+    // ブロック・ミュートユーザーの投稿を除外
+    const filtered = posts.filter((p) =>
+      !mutedUsers.includes(p.uid) &&
+      !blockedUsers.includes(p.uid)
+    );
+
+    if (feedTab === "following") {
+      // フォロー中のユーザーの投稿のみ（自分の投稿も含む）
+      return filtered.filter((p) => following.includes(p.uid) || p.uid === currentUser.uid);
+    }
+
+    if (feedTab === "recommended") {
+      // スコアで並び替え
+      return [...filtered].sort(
+        (a, b) => calcRecommendScore(b, currentUser) - calcRecommendScore(a, currentUser)
+      );
+    }
+
+    // latest: createdAt降順（デフォルト）
+    return filtered;
+  }, [posts, feedTab, currentUser]);
 
   // 投稿
   const createPost = async () => {
@@ -209,9 +259,7 @@ export default function Home() {
         where("text", "==", text)
       );
       const spamSnap = await getDocs(spamQuery);
-      const recentPosts = spamSnap.docs.filter(
-        (d: any) => now - d.data().createdAt <= 3000
-      );
+      const recentPosts = spamSnap.docs.filter((d: any) => now - d.data().createdAt <= 3000);
       if (recentPosts.length >= 2) {
         for (const p of recentPosts) await deleteDoc(doc(db, "posts", p.id));
         alert("荒らし行為と判断し、クリートを削除しました");
@@ -230,13 +278,9 @@ export default function Home() {
         icon: userData?.icon || "",
         verified: currentUser?.verified || false,
         admin: currentUser?.admin || false,
-        replies: 0,
-        reposts: 0,
-        likes: 0,
-        bookmarks: 0,
-        likedUsers: [],
-        repostedUsers: [],
-        bookmarkedUsers: [],
+        replies: 0, reposts: 0, likes: 0, bookmarks: 0,
+        likedUsers: [], repostedUsers: [], bookmarkedUsers: [],
+        impressions: 0,
         createdAt: Date.now(),
       });
 
@@ -255,11 +299,35 @@ export default function Home() {
     <Layout currentUser={currentUser}>
 
       {/* ヘッダー */}
-      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
-        <div className="text-3xl md:text-4xl font-bold">ホーム</div>
+      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800">
+
+        <div className="p-4 pb-0">
+          <div className="text-3xl md:text-4xl font-bold text-white">ホーム</div>
+        </div>
+
+        {/* タブ切替 */}
+        <div className="flex items-center justify-center gap-2 px-4 py-3">
+          {(["following", "recommended", "latest"] as const).map((t) => {
+            const label = t === "following" ? "フォロー中" : t === "recommended" ? "おすすめ" : "新着";
+            const active = feedTab === t;
+            return (
+              <button
+                key={t}
+                onClick={() => setFeedTab(t)}
+                className={`px-5 py-2 rounded-full text-sm font-bold transition ${
+                  active
+                    ? "bg-zinc-700 text-white"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* 投稿フォーム（スマホのみ表示） */}
+      {/* 投稿フォーム（スマホのみ） */}
       <div className="md:hidden border-b border-zinc-800 p-4 flex gap-4">
         <img
           src={userData?.icon || "/default.png"}
@@ -272,8 +340,6 @@ export default function Home() {
             placeholder="いまどうしてる？"
             className="w-full bg-black outline-none resize-none text-lg min-h-[120px] text-white placeholder-zinc-600"
           />
-
-          {/* 画像プレビュー */}
           {imagePreview && (
             <div className="relative mt-3 inline-block">
               <img src={imagePreview} className="rounded-2xl max-h-[350px] object-cover" />
@@ -285,16 +351,10 @@ export default function Home() {
               </button>
             </div>
           )}
-
           <div className="flex items-center justify-between mt-4">
             <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-              画像を選択
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
+              🖼
+              <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
             </label>
             <button
               onClick={createPost}
@@ -307,9 +367,16 @@ export default function Home() {
         </div>
       </div>
 
+      {/* フォロー中で投稿0件 */}
+      {feedTab === "following" && displayPosts.length === 0 && (
+        <p className="text-center text-zinc-600 py-16">
+          フォロー中のユーザーの投稿がありません
+        </p>
+      )}
+
       {/* 投稿一覧 */}
       <div>
-        {posts.map((post: any) => (
+        {displayPosts.map((post: any) => (
           <PostCard
             key={post.id}
             post={post}

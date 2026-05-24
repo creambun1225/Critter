@@ -1,14 +1,59 @@
 @import "tailwindcss";
 
+/* ─── ダークモード（デフォルト） ─── */
+:root {
+  --bg: #000000;
+  --bg-secondary: #18181b;  /* zinc-900 */
+  --bg-hover: #09090b;      /* zinc-950 */
+  --border: #27272a;        /* zinc-800 */
+  --text: #ffffff;
+  --text-secondary: #71717a; /* zinc-500 */
+  --text-muted: #52525b;     /* zinc-600 */
+  --input-bg: #18181b;
+}
+
+/* ─── ライトモード ─── */
+html.light {
+  --bg: #f4f4f5;
+  --bg-secondary: #ffffff;
+  --bg-hover: #e4e4e7;
+  --border: #d4d4d8;
+  --text: #09090b;
+  --text-secondary: #71717a;
+  --text-muted: #a1a1aa;
+  --input-bg: #ffffff;
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
-  background: black;
-  color: white;
+  background: var(--bg);
+  color: var(--text);
   font-family: sans-serif;
+  transition: background 0.2s, color 0.2s;
 }
 
 * {
   box-sizing: border-box;
 }
+
+/* ─── ライトモード用 Tailwind クラス上書き ─── */
+html.light .bg-black { background-color: var(--bg) !important; }
+html.light .bg-black\/90 { background-color: color-mix(in srgb, var(--bg) 90%, transparent) !important; }
+html.light .bg-black\/70 { background-color: color-mix(in srgb, #000 70%, transparent) !important; }
+html.light .bg-zinc-900 { background-color: var(--bg-secondary) !important; }
+html.light .bg-zinc-800 { background-color: #e4e4e7 !important; }
+html.light .bg-zinc-950 { background-color: var(--bg-hover) !important; }
+html.light .hover\:bg-zinc-900:hover { background-color: var(--bg-hover) !important; }
+html.light .hover\:bg-zinc-950:hover { background-color: var(--bg-hover) !important; }
+html.light .hover\:bg-zinc-800:hover { background-color: #d4d4d8 !important; }
+html.light .border-zinc-800 { border-color: var(--border) !important; }
+html.light .border-zinc-700 { border-color: #a1a1aa !important; }
+html.light .text-white { color: var(--text) !important; }
+html.light .text-zinc-500 { color: var(--text-secondary) !important; }
+html.light .text-zinc-600 { color: var(--text-muted) !important; }
+html.light .text-zinc-400 { color: #71717a !important; }
+html.light .bg-zinc-700 { background-color: #d4d4d8 !important; }
+html.light .placeholder-zinc-600::placeholder { color: #a1a1aa !important; }
+html.light .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15) !important; }
