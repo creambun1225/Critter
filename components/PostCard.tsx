@@ -151,7 +151,7 @@ function RepostModal({
           <span className="text-xl">🔁</span>
           <div>
             <p className={`font-bold text-sm ${isReposted ? "text-green-400" : "text-white"}`}>
-              {isReposted ? "リポストを取り消す" : "リポスト"}
+              {isReposted ? "リクリートを取り消す" : "リクリート"}
             </p>
             <p className="text-zinc-500 text-xs">{isReposted ? "タイムラインから削除" : "すぐに投稿"}</p>
           </div>
@@ -160,7 +160,7 @@ function RepostModal({
         <button onClick={() => { onQuote(); onClose(); }} className="w-full text-left px-4 py-3 hover:bg-zinc-900 flex items-center gap-3">
           <span className="text-xl">✏️</span>
           <div>
-            <p className="font-bold text-sm text-white">引用リポスト</p>
+            <p className="font-bold text-sm text-white">引用リクリート</p>
             <p className="text-zinc-500 text-xs">コメントを添えて投稿</p>
           </div>
         </button>
@@ -260,7 +260,7 @@ function QuoteModal({
         <div className="w-full max-w-lg bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
             <button onClick={onClose} className="text-zinc-400 hover:text-white text-2xl px-1">✕</button>
-            <h2 className="font-bold text-white">引用リポスト</h2>
+            <h2 className="font-bold text-white">引用リクリート</h2>
             <button onClick={handleSubmit} disabled={!canSubmit}
               className="bg-white text-black font-bold text-sm px-4 py-1.5 rounded-full disabled:opacity-40 hover:bg-zinc-200 transition">
               {loading ? "投稿中..." : "投稿する"}
@@ -471,7 +471,7 @@ export default function PostCard({
 
             {post.isQuoteRepost && (
               <div className="text-zinc-500 text-xs mt-1 flex items-center gap-1">
-                <span>🔁</span><span>引用リポスト</span>
+                <span>🔁</span><span>引用リクリート</span>
               </div>
             )}
 
@@ -536,7 +536,7 @@ export default function PostCard({
                 <>
                   <button onClick={() => { onAnalytics(post); setOpen(false); }}
                     className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-white flex items-center gap-2">
-                    <span>📊</span><span>アナリティクス</span>
+                    <span></span><span>アナリティクス</span>
                   </button>
                   <div className="border-t border-zinc-800" />
                 </>
