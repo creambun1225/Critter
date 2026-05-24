@@ -156,7 +156,7 @@ export default function SettingsPage() {
 
         {isAdmin && (
           <Link href="/admin/reports" className="w-full block bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/40 rounded-xl p-4 text-left text-yellow-400 font-bold">
-            📋 報告一覧（管理者）
+          　報告一覧（管理者）
           </Link>
         )}
 

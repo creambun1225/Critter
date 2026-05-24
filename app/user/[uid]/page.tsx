@@ -332,14 +332,14 @@ export default function UserProfile() {
                           <>
                             <button onClick={toggleMute}
                               className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2 border-t border-zinc-800">
-                              <span className="text-xl">{isMuted ? "🔊" : "🔇"}</span>
+                              <span className="text-xl"></span>
                               <span className="text-white font-bold text-sm">
                                 {isMuted ? "ミュートを解除" : "ミュートする"}
                               </span>
                             </button>
                             <button onClick={toggleBlock}
                               className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2 border-t border-zinc-800">
-                              <span className="text-xl">🚫</span>
+                              <span className="text-xl"></span>
                               <span className={`font-bold text-sm ${isBlocked ? "text-green-400" : "text-red-400"}`}>
                                 {isBlocked ? "ブロックを解除" : "ブロックする"}
                               </span>
@@ -373,14 +373,14 @@ export default function UserProfile() {
           {/* ブロック中バナー */}
           {isBlocked && !isMe && (
             <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
-              🚫 このユーザーをブロックしています
+              このユーザーをブロックしています
             </div>
           )}
 
           {/* ミュート中バナー */}
           {isMuted && !isMe && (
             <div className="mt-4 bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-zinc-400 text-sm">
-              🔇 このユーザーをミュートしています
+              このユーザーをミュートしています
             </div>
           )}
 
