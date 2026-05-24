@@ -41,8 +41,8 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
 
   const tabs = [
     { key: "likes",   label: "いいね",   count: post.likedUsers?.length || 0 },
-    { key: "reposts", label: "リポスト", count: post.repostedUsers?.length || 0 },
-    { key: "quotes",  label: "引用",     count: null },
+    { key: "reposts", label: "リクリート", count: post.repostedUsers?.length || 0 },
+    { key: "quotes",  label: "引用リクリート",     count: null },
     { key: "replies", label: "リプライ", count: post.replies || 0 },
   ] as const;
 

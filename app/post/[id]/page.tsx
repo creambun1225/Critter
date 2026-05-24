@@ -209,7 +209,7 @@ export default function PostDetailPage() {
 
             {post.isQuoteRepost && (
               <div className="text-zinc-500 text-xs mt-1 flex items-center gap-1">
-                <span>🔁</span><span>引用リポスト</span>
+                <span>🔁</span><span>引用リクリート</span>
               </div>
             )}
 
@@ -234,7 +234,7 @@ export default function PostDetailPage() {
             </div>
 
             <div className="flex gap-6 mt-3 border-t border-zinc-800 pt-3 text-sm text-zinc-400 flex-wrap">
-              <span><span className="font-bold text-white">{post.reposts || 0}</span> リポスト</span>
+              <span><span className="font-bold text-white">{post.reposts || 0}</span> リクリート</span>
               <span><span className="font-bold text-white">{post.likes || 0}</span> いいね</span>
               <span><span className="font-bold text-white">{post.replies || 0}</span> リプライ</span>
               <span><span className="font-bold text-white">{post.bookmarks || 0}</span> ブックマーク</span>
