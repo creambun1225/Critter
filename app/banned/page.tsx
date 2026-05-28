@@ -36,7 +36,7 @@ export default function BannedPage() {
       <div className="w-full max-w-md bg-zinc-950 border border-red-500/30 rounded-3xl p-8 text-center">
 
         {/* アイコン */}
-        <div className="text-6xl mb-6">🚫</div>
+        <div className="text-6xl mb-6"></div>
 
         {/* タイトル */}
         <h1 className="text-2xl font-bold text-red-400 mb-4">
