@@ -1,9 +1,10 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Critter",
-  description: "Critter SNS",
-  manifest: "/manifest.json",
+  title: "Critter"
+};
+
+export const viewport = {
   themeColor: "#000000",
   appleWebApp: {
     capable: true,
