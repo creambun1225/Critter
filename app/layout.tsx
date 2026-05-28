@@ -35,7 +35,6 @@ export default function RootLayout({
                   navigator.serviceWorker.register('/sw.js');
                 });
               }
-              // ダークモード初期化
               (function() {
                 try {
                   var theme = localStorage.getItem('critter_theme');

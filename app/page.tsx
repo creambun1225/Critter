@@ -343,7 +343,7 @@ export default function UserProfile() {
     return (
       <Layout currentUser={currentUser}>
         <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
-          <div className="text-5xl mb-4">🚫</div>
+          <div className="text-5xl mb-4"></div>
           <h2 className="text-xl font-bold text-white mb-2">このアカウントはBANされました</h2>
           <p className="text-zinc-500 text-sm">このユーザーは利用規約に違反したためBANされています。</p>
         </div>
@@ -403,7 +403,7 @@ export default function UserProfile() {
                         {isAdmin && !isMe && !profile.banned && (
                           <button onClick={() => { setShowMenu(false); setShowBanModal(true); }}
                             className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2 border-t border-zinc-800">
-                            <span className="text-xl">🚫</span>
+                            <span className="text-xl"></span>
                             <span className="text-red-400 font-bold text-sm">このアカウントをBAN</span>
                           </button>
                         )}
@@ -427,12 +427,12 @@ export default function UserProfile() {
                           <>
                             <button onClick={toggleMute}
                               className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2 border-t border-zinc-800">
-                              <span className="text-xl">{isMuted ? "🔊" : "🔇"}</span>
+                              <span className="text-xl"></span>
                               <span className="text-white font-bold text-sm">{isMuted ? "ミュートを解除" : "ミュートする"}</span>
                             </button>
                             <button onClick={toggleBlock}
                               className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2 border-t border-zinc-800">
-                              <span className="text-xl">🚫</span>
+                              <span className="text-xl"></span>
                               <span className={`font-bold text-sm ${isBlocked ? "text-green-400" : "text-red-400"}`}>
                                 {isBlocked ? "ブロックを解除" : "ブロックする"}
                               </span>
@@ -466,18 +466,18 @@ export default function UserProfile() {
           {/* BANバナー（管理者向け） */}
           {profile.banned && isAdmin && (
             <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
-              🚫 このアカウントはBANされています｜理由: {profile.banReason || "記載なし"}
+              このアカウントはBANされています｜理由: {profile.banReason || "記載なし"}
             </div>
           )}
 
           {isBlocked && !isMe && (
             <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
-              🚫 このユーザーをブロックしています
+              このユーザーをブロックしています
             </div>
           )}
           {isMuted && !isMe && (
             <div className="mt-4 bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-zinc-400 text-sm">
-              🔇 このユーザーをミュートしています
+              このユーザーをミュートしています
             </div>
           )}
 
