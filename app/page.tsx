@@ -311,16 +311,79 @@ export default function Home() {
 
     <Layout currentUser={currentUser}>
 
-      {/* タイトル */}
-      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
+{/* 上ヘッダー */}
+<div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800">
 
-        <div className="text-3xl md:text-4xl font-bold">
+  {/* タイトル */}
+  <div className="p-4">
 
-          ホーム
+    <div className="text-3xl md:text-4xl font-bold">
 
-        </div>
+      ホーム
 
-      </div>
+    </div>
+
+  </div>
+
+  {/* タブ */}
+  <div className="flex">
+
+    <button
+      className="
+        flex-1
+        py-4
+        font-bold
+        border-b-2
+        border-white
+        text-white
+        hover:bg-zinc-900
+        transition
+      "
+    >
+
+      おすすめ
+
+    </button>
+
+    <button
+      className="
+        flex-1
+        py-4
+        font-bold
+        border-b-2
+        border-transparent
+        text-zinc-500
+        hover:bg-zinc-900
+        hover:text-white
+        transition
+      "
+    >
+
+      フォロー中
+
+    </button>
+
+    <button
+      className="
+        flex-1
+        py-4
+        font-bold
+        border-b-2
+        border-transparent
+        text-zinc-500
+        hover:bg-zinc-900
+        hover:text-white
+        transition
+      "
+    >
+
+      新着
+
+    </button>
+
+  </div>
+
+</div>
 
       {/* 投稿フォーム */}
       <div className="border-b border-zinc-800 p-4 flex gap-4">
