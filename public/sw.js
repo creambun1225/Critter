@@ -47,3 +47,50 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+
+// プッシュ通知
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  try {
+    const data = event.data.json();
+    const options = {
+      body: data.body || "Critterからの通知です",
+      icon: "/logo.png",
+      badge: "/logo.png",
+      tag: data.tag || "critter-notification",
+      requireInteraction: false,
+      actions: [
+        { action: "open", title: "開く" },
+        { action: "close", title: "閉じる" },
+      ],
+    };
+
+    event.waitUntil(
+      self.registration.showNotification(data.title || "Critter", options)
+    );
+  } catch (e) {
+    console.error("Push notification error:", e);
+  }
+});
+
+// 通知クリック
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  if (event.action === "close") return;
+
+  event.waitUntil(
+    clients.matchAll({ type: "window" }).then((clientList) => {
+      for (let i = 0; i < clientList.length; i++) {
+        const client = clientList[i];
+        if (client.url === "/" && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow("/");
+      }
+    })
+  );
+});

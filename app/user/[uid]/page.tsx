@@ -70,7 +70,7 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const tabs = [
     { key: "likes", label: "いいね", count: post.likedUsers?.length || 0 },
-    { key: "reposts", label: "リポスト", count: post.repostedUsers?.length || 0 },
+    { key: "reposts", label: "リクリート", count: post.repostedUsers?.length || 0 },
     { key: "quotes", label: "引用", count: null },
     { key: "replies", label: "リプライ", count: post.replies || 0 },
   ] as const;
@@ -142,6 +142,83 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
 }
 
 // ───────────────────────────────────────
+// BANモーダル（管理者用）
+// ───────────────────────────────────────
+function BanModal({ targetUid, targetName, onClose }: { targetUid: string; targetName: string; onClose: () => void }) {
+  const [step, setStep] = useState<"password" | "reason">("password");
+  const [adminPw, setAdminPw] = useState("");
+  const [reason, setReason] = useState("");
+  const [banning, setBanning] = useState(false);
+  const [pwError, setPwError] = useState("");
+
+  const checkPassword = () => {
+    if (adminPw !== "annpannmann") { setPwError("パスワードが違います"); return; }
+    setStep("reason");
+  };
+
+  const executeBan = async () => {
+    if (!reason.trim()) { alert("理由を入力してください"); return; }
+    setBanning(true);
+    try {
+      await updateDoc(doc(db, "users", targetUid), {
+        banned: true,
+        banReason: reason.trim(),
+      });
+      alert(`${targetName} をBANしました`);
+      onClose();
+      location.reload();
+    } catch (e) {
+      console.error(e);
+      alert("BANに失敗しました");
+    } finally {
+      setBanning(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/70" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-sm bg-black border border-red-500/40 rounded-2xl shadow-2xl p-6">
+
+          {step === "password" ? (
+            <>
+              <h2 className="font-bold text-white text-lg mb-1">🚫 アカウントをBAN</h2>
+              <p className="text-zinc-500 text-sm mb-4">管理者パスワードを入力してください</p>
+              <input type="password" value={adminPw} onChange={(e) => setAdminPw(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") checkPassword(); }}
+                placeholder="管理者パスワード" autoFocus
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white outline-none focus:border-red-500 transition mb-3" />
+              {pwError && <p className="text-red-500 text-sm mb-3">{pwError}</p>}
+              <div className="flex gap-3">
+                <button onClick={onClose} className="flex-1 border border-zinc-700 py-2.5 rounded-full font-bold hover:bg-zinc-900 transition text-white">キャンセル</button>
+                <button onClick={checkPassword} className="flex-1 bg-red-500 hover:bg-red-600 py-2.5 rounded-full font-bold text-white transition">次へ</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="font-bold text-white text-lg mb-1">BAN理由を入力</h2>
+              <p className="text-zinc-500 text-sm mb-4">@{targetName} へのBAN理由を記入してください</p>
+              <textarea value={reason} onChange={(e) => setReason(e.target.value)}
+                placeholder="例）スパム行為・規約違反・荒らし行為など"
+                rows={4} autoFocus
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white outline-none resize-none focus:border-red-500 transition mb-4" />
+              <div className="flex gap-3">
+                <button onClick={onClose} className="flex-1 border border-zinc-700 py-2.5 rounded-full font-bold hover:bg-zinc-900 transition text-white">キャンセル</button>
+                <button onClick={executeBan} disabled={banning || !reason.trim()}
+                  className="flex-1 bg-red-500 hover:bg-red-600 py-2.5 rounded-full font-bold text-white transition disabled:opacity-40">
+                  {banning ? "処理中..." : "BANする"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ───────────────────────────────────────
 // メインページ
 // ───────────────────────────────────────
 export default function UserProfile() {
@@ -158,8 +235,7 @@ export default function UserProfile() {
   const [followModal, setFollowModal] = useState<null | "followers" | "following">(null);
   const [analyticsPost, setAnalyticsPost] = useState<any>(null);
   const [showMenu, setShowMenu] = useState(false);
-
-  // ブロック・ミュート状態
+  const [showBanModal, setShowBanModal] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
@@ -195,7 +271,6 @@ export default function UserProfile() {
     return () => unsub();
   }, [uid]);
 
-  // フォロー
   const toggleFollow = async () => {
     if (!me) return;
     const already = followers.includes(me.uid);
@@ -221,7 +296,6 @@ export default function UserProfile() {
     }
   };
 
-  // ブロック
   const toggleBlock = async () => {
     if (!me) return;
     const myRef = doc(db, "users", me.uid);
@@ -231,7 +305,6 @@ export default function UserProfile() {
     } else {
       await updateDoc(myRef, { blockedUsers: arrayUnion(uid) });
       setIsBlocked(true);
-      // ブロック時はフォローも解除
       if (followers.includes(me.uid)) {
         await updateDoc(doc(db, "users", uid), { followers: arrayRemove(me.uid) });
         await updateDoc(myRef, { following: arrayRemove(uid) });
@@ -241,7 +314,6 @@ export default function UserProfile() {
     setShowMenu(false);
   };
 
-  // ミュート
   const toggleMute = async () => {
     if (!me) return;
     const myRef = doc(db, "users", me.uid);
@@ -255,7 +327,6 @@ export default function UserProfile() {
     setShowMenu(false);
   };
 
-  // 認証マーク付与/削除（管理者のみ）
   const toggleVerified = async () => {
     if (!currentUser?.admin) return;
     const newVerified = !profile.verified;
@@ -267,13 +338,24 @@ export default function UserProfile() {
 
   if (!profile) return null;
 
+  // BANされているプロフィールを表示
+  if (profile.banned && me?.uid !== uid && !currentUser?.admin) {
+    return (
+      <Layout currentUser={currentUser}>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
+          <div className="text-5xl mb-4">🚫</div>
+          <h2 className="text-xl font-bold text-white mb-2">このアカウントはBANされました</h2>
+          <p className="text-zinc-500 text-sm">このユーザーは利用規約に違反したためBANされています。</p>
+        </div>
+      </Layout>
+    );
+  }
+
   const filteredPosts = tab === "posts"
     ? posts.filter((p) => !p.isQuoteRepost || p.uid === uid)
     : posts.filter((p) => p.repostedUsers?.includes(uid));
 
-  // ミュート中は投稿を非表示
   const displayPosts = isMuted ? [] : filteredPosts;
-
   const followingList = profile.following || [];
   const isMe = me?.uid === uid;
   const isAdmin = currentUser?.admin === true;
@@ -284,32 +366,23 @@ export default function UserProfile() {
 
         {/* ヘッダー画像 */}
         <div className="h-40 bg-zinc-800 overflow-hidden">
-          {profile.headerImage && (
-            <img src={profile.headerImage} className="w-full h-full object-cover" />
-          )}
+          {profile.headerImage && <img src={profile.headerImage} className="w-full h-full object-cover" />}
         </div>
 
-        {/* プロフィール情報 */}
         <div className="-mt-16 px-6">
           <div className="flex items-end justify-between">
-            <img
-              src={profile.icon || "/default.png"}
-              className="w-32 h-32 rounded-full border-4 border-black object-cover bg-zinc-700"
-            />
+            <img src={profile.icon || "/default.png"}
+              className="w-32 h-32 rounded-full border-4 border-black object-cover bg-zinc-700" />
 
-            {/* 右上ボタン群 */}
             <div className="flex items-center gap-2 pb-2">
 
-              {/* ⋯ メニュー（自分以外 or 管理者） */}
+              {/* ⋯ メニュー */}
               {(!isMe || isAdmin) && (
                 <div className="relative">
-                  <button
-                    onClick={() => setShowMenu((p) => !p)}
-                    className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition"
-                  >
+                  <button onClick={() => setShowMenu((p) => !p)}
+                    className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition">
                     ⋯
                   </button>
-
                   {showMenu && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
@@ -319,27 +392,47 @@ export default function UserProfile() {
                         {isAdmin && (
                           <button onClick={toggleVerified}
                             className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2">
-                            {profile.verified ? (
-                              <><img src="/verified-blue.png" className="w-5 h-5" /><span className="text-white font-bold text-sm">認証マークを削除</span></>
-                            ) : (
-                              <><span className="text-blue-400 text-lg">✓</span><span className="text-white font-bold text-sm">認証マークを付与</span></>
-                            )}
+                            {profile.verified
+                              ? <><img src="/verified-blue.png" className="w-5 h-5" /><span className="text-white font-bold text-sm">認証マークを削除</span></>
+                              : <><span className="text-blue-400 text-lg">✓</span><span className="text-white font-bold text-sm">認証マークを付与</span></>
+                            }
                           </button>
                         )}
 
-                        {/* 自分以外：ブロック・ミュート */}
+                        {/* 管理者：BAN */}
+                        {isAdmin && !isMe && !profile.banned && (
+                          <button onClick={() => { setShowMenu(false); setShowBanModal(true); }}
+                            className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2 border-t border-zinc-800">
+                            <span className="text-xl">🚫</span>
+                            <span className="text-red-400 font-bold text-sm">このアカウントをBAN</span>
+                          </button>
+                        )}
+
+                        {/* 管理者：BAN解除 */}
+                        {isAdmin && !isMe && profile.banned && (
+                          <button onClick={async () => {
+                            await updateDoc(doc(db, "users", uid), { banned: false, banReason: "" });
+                            setProfile((p: any) => ({ ...p, banned: false }));
+                            setShowMenu(false);
+                            alert("BAN解除しました");
+                          }}
+                            className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2 border-t border-zinc-800">
+                            <span className="text-xl">✅</span>
+                            <span className="text-green-400 font-bold text-sm">BAN解除</span>
+                          </button>
+                        )}
+
+                        {/* 自分以外：ミュート・ブロック */}
                         {!isMe && (
                           <>
                             <button onClick={toggleMute}
                               className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2 border-t border-zinc-800">
-                              <span className="text-xl"></span>
-                              <span className="text-white font-bold text-sm">
-                                {isMuted ? "ミュートを解除" : "ミュートする"}
-                              </span>
+                              <span className="text-xl">{isMuted ? "🔊" : "🔇"}</span>
+                              <span className="text-white font-bold text-sm">{isMuted ? "ミュートを解除" : "ミュートする"}</span>
                             </button>
                             <button onClick={toggleBlock}
                               className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition flex items-center gap-2 border-t border-zinc-800">
-                              <span className="text-xl"></span>
+                              <span className="text-xl">🚫</span>
                               <span className={`font-bold text-sm ${isBlocked ? "text-green-400" : "text-red-400"}`}>
                                 {isBlocked ? "ブロックを解除" : "ブロックする"}
                               </span>
@@ -352,7 +445,7 @@ export default function UserProfile() {
                 </div>
               )}
 
-              {/* フォロー / プロフィール編集 */}
+              {/* フォロー / 編集 */}
               {!isMe ? (
                 !isBlocked && (
                   <button onClick={toggleFollow}
@@ -370,21 +463,24 @@ export default function UserProfile() {
             </div>
           </div>
 
-          {/* ブロック中バナー */}
+          {/* BANバナー（管理者向け） */}
+          {profile.banned && isAdmin && (
+            <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+              🚫 このアカウントはBANされています｜理由: {profile.banReason || "記載なし"}
+            </div>
+          )}
+
           {isBlocked && !isMe && (
             <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
-              このユーザーをブロックしています
+              🚫 このユーザーをブロックしています
             </div>
           )}
-
-          {/* ミュート中バナー */}
           {isMuted && !isMe && (
             <div className="mt-4 bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-zinc-400 text-sm">
-              このユーザーをミュートしています
+              🔇 このユーザーをミュートしています
             </div>
           )}
 
-          {/* 名前・バッジ */}
           <div className="mt-3">
             <div className="flex items-center gap-2">
               <h1 className="text-3xl font-bold">{profile.name}</h1>
@@ -396,7 +492,6 @@ export default function UserProfile() {
 
           <p className="mt-5 text-white">{profile.bio}</p>
 
-          {/* フォロー数・フォロワー数 */}
           <div className="flex gap-8 mt-5">
             <button onClick={() => setFollowModal("following")} className="hover:underline text-left">
               <span className="font-bold text-white">{followingList.length}</span>
@@ -417,11 +512,10 @@ export default function UserProfile() {
           </button>
           <button onClick={() => setTab("reposts")}
             className={`flex-1 py-4 font-bold text-sm transition border-b-2 ${tab === "reposts" ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}>
-            リポスト
+            リクリート
           </button>
         </div>
 
-        {/* 投稿一覧 */}
         <div>
           {isMuted && !isMe ? (
             <p className="text-center text-zinc-600 py-10">ミュート中のため投稿は非表示です</p>
@@ -429,7 +523,7 @@ export default function UserProfile() {
             <p className="text-center text-zinc-600 py-10">ブロック中のため投稿は非表示です</p>
           ) : displayPosts.length === 0 ? (
             <p className="text-center text-zinc-600 py-10">
-              {tab === "posts" ? "まだクリートがありません" : "まだリポストがありません"}
+              {tab === "posts" ? "まだクリートがありません" : "まだリクリートがありません"}
             </p>
           ) : (
             displayPosts.map((post) => (
@@ -442,6 +536,7 @@ export default function UserProfile() {
       {followModal === "following" && <FollowListModal title="フォロー中" uids={followingList} onClose={() => setFollowModal(null)} />}
       {followModal === "followers" && <FollowListModal title="フォロワー" uids={followers} onClose={() => setFollowModal(null)} />}
       {analyticsPost && <AnalyticsModal post={analyticsPost} onClose={() => setAnalyticsPost(null)} />}
+      {showBanModal && <BanModal targetUid={uid} targetName={profile.username} onClose={() => setShowBanModal(false)} />}
     </Layout>
   );
 }
