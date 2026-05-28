@@ -1,246 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import Layout from "@/components/Layout";
-import PostCard from "@/components/PostCard";
-import { db, auth } from "@/lib/firebase";
 
 import {
-  doc,
-  getDoc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
   collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  onSnapshot,
   addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  doc,
+  getDoc
 } from "firebase/firestore";
 
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "firebase/storage";
 
-// ───────────────────────────────────────
-// フォローリストモーダル
-// ───────────────────────────────────────
-function FollowListModal({
-  title,
-  uids,
-  onClose
-}: {
-  title: string;
-  uids: string[];
-  onClose: () => void;
-}) {
+import {
+  onAuthStateChanged
+} from "firebase/auth";
 
-  const [users, setUsers] =
-    useState<any[]>([]);
+import {
+  db,
+  auth,
+  storage
+} from "@/lib/firebase";
 
-  useEffect(() => {
+import Layout from "@/components/Layout";
+import PostCard from "@/components/PostCard";
 
-    if (uids.length === 0) {
+export default function Home() {
 
-      setUsers([]);
-      return;
+  const [text, setText] =
+    useState("");
 
-    }
-
-    Promise.all(
-
-      uids.map(async (uid) => {
-
-        const snap =
-          await getDoc(
-            doc(db, "users", uid)
-          );
-
-        return snap.exists()
-          ? {
-              uid,
-              ...snap.data()
-            }
-          : null;
-
-      })
-
-    ).then((r) =>
-      setUsers(
-        r.filter(Boolean)
-      )
-    );
-
-  }, [uids]);
-
-  return (
-    <>
-      <div
-        className="fixed inset-0 z-40 bg-black/70"
-        onClick={onClose}
-      />
-
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-
-        <div className="w-full max-w-md bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
-
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
-
-            <button
-              onClick={onClose}
-              className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900"
-            >
-
-              ✕
-
-            </button>
-
-            <h2 className="font-bold text-white text-lg">
-
-              {title}
-
-            </h2>
-
-            <div className="w-10" />
-
-          </div>
-
-          <div className="overflow-y-auto">
-
-            {users.length === 0 ? (
-
-              <p className="text-center text-zinc-500 py-10">
-
-                まだいません
-
-              </p>
-
-            ) : (
-
-              users.map((user) => (
-
-                <Link
-                  key={user.uid}
-                  href={`/user/${user.uid}`}
-                  onClick={onClose}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition"
-                >
-
-                  <img
-                    src={
-                      user.icon ||
-                      "/default.png"
-                    }
-                    className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0"
-                  />
-
-                  <div className="min-w-0">
-
-                    <div className="flex items-center gap-1">
-
-                      <span className="font-bold text-white truncate">
-
-                        {user.name}
-
-                      </span>
-
-                      {user.verified && (
-
-                        <img
-                          src="/verified-blue.png"
-                          className="w-4 h-4"
-                        />
-
-                      )}
-
-                      {user.admin && (
-
-                        <img
-                          src="/verified-gold.png"
-                          className="w-4 h-4"
-                        />
-
-                      )}
-
-                    </div>
-
-                    <div className="text-zinc-500 text-sm truncate">
-
-                      @{user.username}
-
-                    </div>
-
-                  </div>
-
-                </Link>
-
-              ))
-
-            )}
-
-          </div>
-
-        </div>
-
-      </div>
-    </>
-  );
-
-}
-
-// ───────────────────────────────────────
-// メインページ
-// ───────────────────────────────────────
-export default function UserProfile() {
-
-  const params =
-    useParams();
-
-  // ← 修正ポイント
-  const uid =
-    typeof params.uid === "string"
-      ? params.uid
-      : "";
-
-  const [profile, setProfile] =
+  const [image, setImage] =
     useState<any>(null);
-
-  const [me, setMe] =
-    useState<any>(null);
-
-  const [currentUser, setCurrentUser] =
-    useState<any>(null);
-
-  const [followers, setFollowers] =
-    useState<string[]>([]);
-
-  const [following, setFollowing] =
-    useState<string[]>([]);
 
   const [posts, setPosts] =
     useState<any[]>([]);
 
-  const [tab, setTab] =
-    useState<"posts" | "reposts">(
-      "posts"
-    );
+  const [currentUser, setCurrentUser] =
+    useState<any>(null);
 
-  const [followModal, setFollowModal] =
-    useState<
-      null |
-      "followers" |
-      "following"
-    >(null);
+  const [userData, setUserData] =
+    useState<any>(null);
 
-  // ─────────────────────
-  // ユーザー取得
-  // ─────────────────────
+  // ログイン確認
   useEffect(() => {
-
-    // ← 修正ポイント
-    if (!uid) return;
 
     const unsub =
       onAuthStateChanged(
@@ -257,57 +66,47 @@ export default function UserProfile() {
 
           }
 
-          setMe(user);
+          try {
 
-          const profileSnap =
-            await getDoc(
-              doc(
-                db,
-                "users",
-                uid
-              )
-            );
+            const snap =
+              await getDoc(
+                doc(
+                  db,
+                  "users",
+                  user.uid
+                )
+              );
 
-          if (
-            profileSnap.exists()
-          ) {
+            if (snap.exists()) {
 
-            const data =
-              profileSnap.data();
+              const data =
+                snap.data();
 
-            setProfile({
-              uid,
-              ...data
-            });
+              setCurrentUser({
 
-            setFollowers(
-              data.followers || []
-            );
+                uid:
+                  user.uid,
 
-          }
+                email:
+                  user.email,
 
-          const mySnap =
-            await getDoc(
-              doc(
-                db,
-                "users",
-                user.uid
-              )
-            );
+                photoURL:
+                  user.photoURL,
 
-          if (mySnap.exists()) {
+                displayName:
+                  user.displayName,
 
-            const myData =
-              mySnap.data();
+                ...data
 
-            setFollowing(
-              myData.following || []
-            );
+              });
 
-            setCurrentUser({
-              uid: user.uid,
-              ...myData
-            });
+              setUserData(data);
+
+            }
+
+          } catch (err) {
+
+            console.error(err);
 
           }
 
@@ -317,430 +116,298 @@ export default function UserProfile() {
 
     return () => unsub();
 
-  }, [uid]);
+  }, []);
 
-  // ─────────────────────
   // 投稿取得
-  // ─────────────────────
   useEffect(() => {
 
-    // ← 修正ポイント
-    if (!uid) return;
+    if (!db) return;
 
-    const q = query(
+    try {
 
-      collection(
-        db,
-        "posts"
-      ),
+      const q = query(
 
-      where(
-        "uid",
-        "==",
-        uid
-      ),
+        collection(
+          db,
+          "posts"
+        ),
 
-      orderBy(
-        "createdAt",
-        "desc"
-      )
+        orderBy(
+          "createdAt",
+          "desc"
+        )
 
-    );
-
-    const unsub =
-      onSnapshot(
-        q,
-        (snap) => {
-
-          setPosts(
-
-            snap.docs.map((d) => ({
-
-              id: d.id,
-
-              ...d.data()
-
-            }))
-
-          );
-
-        }
       );
 
-    return () => unsub();
+      const unsub =
+        onSnapshot(
+          q,
+          (snap) => {
 
-  }, [uid]);
+            setPosts(
 
-  // ─────────────────────
-  // フォロー
-  // ─────────────────────
-  const toggleFollow =
+              snap.docs.map(
+                (doc:any) => ({
+
+                  id: doc.id,
+
+                  ...doc.data()
+
+                })
+              )
+
+            );
+
+          }
+        );
+
+      return () => unsub();
+
+    } catch (err) {
+
+      console.error(err);
+
+    }
+
+  }, []);
+
+  // 投稿
+  const createPost =
     async () => {
 
-      if (!me) return;
+      if (
+        !currentUser ||
+        !userData
+      ) return;
 
-      const already =
-        followers.includes(
-          me.uid
-        );
+      if (
+        !text.trim() &&
+        !image
+      ) return;
 
-      const profileRef =
-        doc(
-          db,
-          "users",
-          uid
-        );
+      let imageUrl = "";
 
-      const myRef =
-        doc(
-          db,
-          "users",
-          me.uid
-        );
+      try {
 
-      if (already) {
+        // 画像アップロード
+        if (image) {
 
-        await updateDoc(
-          profileRef,
-          {
-            followers:
-              arrayRemove(
-                me.uid
-              )
-          }
-        );
+          const imageRef =
+            ref(
+              storage,
+              `posts/${Date.now()}_${image.name}`
+            );
 
-        await updateDoc(
-          myRef,
-          {
-            following:
-              arrayRemove(uid)
-          }
-        );
+          await uploadBytes(
+            imageRef,
+            image
+          );
 
-        setFollowers(
+          imageUrl =
+            await getDownloadURL(
+              imageRef
+            );
 
-          followers.filter(
-            (id) =>
-              id !== me.uid
-          )
+        }
 
-        );
+        // ハッシュタグ抽出
+        const hashtags =
+          text.match(
+            /#\w+/g
+          ) || [];
 
-        setFollowing(
-
-          following.filter(
-            (id) =>
-              id !== uid
-          )
-
-        );
-
-      } else {
-
-        await updateDoc(
-          profileRef,
-          {
-            followers:
-              arrayUnion(
-                me.uid
-              )
-          }
-        );
-
-        await updateDoc(
-          myRef,
-          {
-            following:
-              arrayUnion(uid)
-          }
-        );
-
-        setFollowers([
-          ...followers,
-          me.uid
-        ]);
-
-        setFollowing([
-          ...following,
-          uid
-        ]);
-
+        // 投稿保存
         await addDoc(
+
           collection(
             db,
-            "notifications"
+            "posts"
           ),
+
           {
-            type: "follow",
-            toUid: uid,
-            fromUid: me.uid,
+
+            text,
+
+            image:
+              imageUrl,
+
+            hashtags,
+
+            uid:
+              currentUser.uid,
+
+            name:
+              userData?.name ||
+              "ユーザー",
+
+            username:
+              userData?.username ||
+              "user",
+
+            icon:
+              userData?.icon ||
+              "",
+
+            verified:
+              currentUser?.verified ||
+              false,
+
+            admin:
+              currentUser?.admin ||
+              false,
+
+            replies:
+              0,
+
+            reposts:
+              0,
+
+            likes:
+              0,
+
+            bookmarks:
+              0,
+
+            likedUsers: [],
+
+            repostedUsers: [],
+
+            bookmarkedUsers: [],
+
             createdAt:
               Date.now()
+
           }
+
+        );
+
+        setText("");
+        setImage(null);
+
+      } catch (err) {
+
+        console.error(err);
+
+        alert(
+          "投稿に失敗しました"
         );
 
       }
 
     };
 
-  if (!profile)
-    return null;
+  // ローディング
+  if (!currentUser) {
 
-  const followingList =
-    profile.following || [];
+    return (
+
+      <div className="bg-black min-h-screen" />
+
+    );
+
+  }
 
   return (
 
     <Layout currentUser={currentUser}>
 
-      <div className="bg-black min-h-screen text-white">
+      {/* タイトル */}
+      <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
 
-        {/* ヘッダー */}
-        <div className="h-40 bg-zinc-800 overflow-hidden">
+        <div className="text-3xl md:text-4xl font-bold">
 
-          {profile.headerImage && (
-
-            <img
-              src={
-                profile.headerImage
-              }
-              className="w-full h-full object-cover"
-            />
-
-          )}
-
-        </div>
-
-        {/* プロフィール */}
-        <div className="-mt-16 px-6">
-
-          <div className="flex items-end justify-between">
-
-            <img
-              src={
-                profile.icon ||
-                "/default.png"
-              }
-              className="w-32 h-32 rounded-full border-4 border-black object-cover bg-zinc-700"
-            />
-
-            {me?.uid !== uid && (
-
-              <button
-                onClick={
-                  toggleFollow
-                }
-                className="bg-white text-black px-5 py-2 rounded-full font-bold hover:bg-zinc-200 transition"
-              >
-
-                {followers.includes(
-                  me?.uid
-                )
-                  ? "フォロー中"
-                  : "フォロー"}
-
-              </button>
-
-            )}
-
-          </div>
-
-          {/* 名前 */}
-          <div className="mt-3">
-
-            <div className="flex items-center gap-2">
-
-              <h1 className="text-3xl font-bold">
-
-                {profile.name}
-
-              </h1>
-
-              {profile.verified && (
-
-                <img
-                  src="/verified-blue.png"
-                  className="w-6 h-6"
-                />
-
-              )}
-
-              {profile.admin && (
-
-                <img
-                  src="/verified-gold.png"
-                  className="w-6 h-6"
-                />
-
-              )}
-
-            </div>
-
-            <div className="text-zinc-500">
-
-              @{profile.username}
-
-            </div>
-
-          </div>
-
-          {/* BIO */}
-          <p className="mt-5 text-white">
-
-            {profile.bio}
-
-          </p>
-
-          {/* フォロー */}
-          <div className="flex gap-8 mt-5">
-
-            <button
-              onClick={()=>
-                setFollowModal(
-                  "following"
-                )
-              }
-              className="hover:underline text-left"
-            >
-
-              <span className="font-bold text-white">
-
-                {
-                  followingList.length
-                }
-
-              </span>
-
-              <span className="text-zinc-500 ml-1">
-
-                フォロー中
-
-              </span>
-
-            </button>
-
-            <button
-              onClick={()=>
-                setFollowModal(
-                  "followers"
-                )
-              }
-              className="hover:underline text-left"
-            >
-
-              <span className="font-bold text-white">
-
-                {
-                  followers.length
-                }
-
-              </span>
-
-              <span className="text-zinc-500 ml-1">
-
-                フォロワー
-
-              </span>
-
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* タブ */}
-        <div className="flex border-b border-zinc-800 mt-6">
-
-          <button
-            onClick={()=>
-              setTab("posts")
-            }
-            className={`flex-1 py-4 font-bold text-sm transition border-b-2 ${
-              tab === "posts"
-                ? "border-white text-white"
-                : "border-transparent text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-
-            クリート
-
-          </button>
-
-          <button
-            onClick={()=>
-              setTab("reposts")
-            }
-            className={`flex-1 py-4 font-bold text-sm transition border-b-2 ${
-              tab === "reposts"
-                ? "border-white text-white"
-                : "border-transparent text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-
-            リクリート
-
-          </button>
-
-        </div>
-
-        {/* 投稿 */}
-        <div>
-
-          {posts.length === 0 ? (
-
-            <p className="text-center text-zinc-600 py-10">
-
-              まだクリートがありません
-
-            </p>
-
-          ) : (
-
-            posts.map((post) => (
-
-              <PostCard
-                key={post.id}
-                post={post}
-                currentUser={
-                  currentUser
-                }
-              />
-
-            ))
-
-          )}
+          ホーム
 
         </div>
 
       </div>
 
-      {/* モーダル */}
-      {followModal ===
-        "following" && (
+      {/* 投稿フォーム */}
+      <div className="border-b border-zinc-800 p-4 flex gap-4">
 
-        <FollowListModal
-          title="フォロー中"
-          uids={followingList}
-          onClose={()=>
-            setFollowModal(null)
+        {/* アイコン */}
+        <img
+          src={
+            userData?.icon ||
+            "/default.png"
           }
+          className="w-12 h-12 md:w-14 md:h-14 rounded-full object-cover bg-zinc-700 flex-shrink-0"
         />
 
-      )}
+        <div className="flex-1">
 
-      {followModal ===
-        "followers" && (
+          {/* テキスト */}
+          <textarea
+            value={text}
+            onChange={(e)=>
+              setText(
+                e.target.value
+              )
+            }
+            placeholder="いまどうしてる？"
+            className="w-full bg-black outline-none resize-none text-lg md:text-xl min-h-[120px]"
+          />
 
-        <FollowListModal
-          title="フォロワー"
-          uids={followers}
-          onClose={()=>
-            setFollowModal(null)
-          }
-        />
+          {/* 画像 */}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e)=>
+              setImage(
+                e.target.files?.[0]
+              )
+            }
+            className="mt-4"
+          />
 
-      )}
+          {/* プレビュー */}
+          {image && (
+
+            <img
+              src={
+                URL.createObjectURL(
+                  image
+                )
+              }
+              className="mt-4 rounded-2xl max-h-[350px] object-cover"
+            />
+
+          )}
+
+          {/* ボタン */}
+          <div className="flex justify-end mt-4">
+
+            <button
+              onClick={createPost}
+              className="bg-blue-500 hover:bg-blue-600 transition px-6 md:px-8 py-3 rounded-full text-lg font-bold"
+            >
+
+              クリート
+
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* 投稿一覧 */}
+      <div>
+
+        {posts.map((post:any)=>(
+
+          <PostCard
+            key={post.id}
+            post={post}
+            currentUser={
+              currentUser || null
+            }
+          />
+
+        ))}
+
+      </div>
 
     </Layout>
 
