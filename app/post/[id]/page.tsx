@@ -67,6 +67,7 @@ export default function PostDetailPage() {
         icon: currentUser.icon || "",
         verified: currentUser.verified || false,
         admin: currentUser.admin || false,
+        likedUsers: [],
         createdAt: Date.now(),
       });
 
@@ -285,25 +286,77 @@ export default function PostDetailPage() {
         {replies.length === 0 ? (
           <p className="text-center text-zinc-600 py-10">リプライはまだありません</p>
         ) : (
-          replies.map((reply) => (
-            <div key={reply.id} className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">
-              <div className="flex gap-3">
-                <Link href={`/user/${reply.uid}`}>
-                  <img src={reply.icon || "/default.png"} className="w-10 h-10 rounded-full object-cover bg-zinc-700" />
-                </Link>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Link href={`/user/${reply.uid}`} className="font-bold text-white hover:underline text-sm">{reply.name}</Link>
-                    {reply.verified && <img src="/verified-blue.png" className="w-4 h-4" />}
-                    {reply.admin && <img src="/verified-gold.png" className="w-4 h-4" />}
-                    <span className="text-zinc-500 text-sm">@{reply.username}</span>
-                    <span className="text-zinc-600 text-xs">{new Date(reply.createdAt).toLocaleString("ja-JP")}</span>
+          replies.map((reply) => {
+            const isReplyLiked = reply.likedUsers?.includes(currentUser?.uid);
+            const isReplyOwner = currentUser?.uid === reply.uid;
+            const canDeleteReply = isReplyOwner || currentUser?.admin;
+
+            return (
+              <div key={reply.id} className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="flex gap-3 flex-1 min-w-0">
+                    <Link href={`/user/${reply.uid}`} className="shrink-0">
+                      <img src={reply.icon || "/default.png"} className="w-10 h-10 rounded-full object-cover bg-zinc-700" />
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link href={`/user/${reply.uid}`} className="font-bold text-white hover:underline text-sm">{reply.name}</Link>
+                        {reply.verified && <img src="/verified-blue.png" className="w-4 h-4" />}
+                        {reply.admin && <img src="/verified-gold.png" className="w-4 h-4" />}
+                        <span className="text-zinc-500 text-sm">@{reply.username}</span>
+                        <span className="text-zinc-600 text-xs">{new Date(reply.createdAt).toLocaleString("ja-JP")}</span>
+                      </div>
+                      <p className="mt-2 text-white text-sm whitespace-pre-wrap break-words">{reply.text}</p>
+
+                      {/* リプライのアクションボタン */}
+                      <div className="flex justify-between mt-3 max-w-xs text-zinc-500 text-sm">
+                        <button onClick={async () => {
+                          if (!currentUser) return;
+                          const likedUsers = reply.likedUsers || [];
+                          const alreadyLiked = likedUsers.includes(currentUser.uid);
+                          const newLikedUsers = alreadyLiked
+                            ? likedUsers.filter((id: string) => id !== currentUser.uid)
+                            : [...likedUsers, currentUser.uid];
+                          const replyDocRef = doc(db, "posts", postId, "replies", reply.id);
+                          await updateDoc(replyDocRef, {
+                            likedUsers: newLikedUsers,
+                          });
+                          setReplies((prev) =>
+                            prev.map((r) =>
+                              r.id === reply.id ? { ...r, likedUsers: newLikedUsers } : r
+                            )
+                          );
+                        }}
+                          className={`hover:text-pink-400 transition ${isReplyLiked ? "text-pink-400" : ""}`}>
+                          ❤️ {reply.likedUsers?.length || 0}
+                        </button>
+
+                        {canDeleteReply && (
+                          <button onClick={async () => {
+                            const ok = confirm("リプライを削除しますか？");
+                            if (!ok) return;
+                            try {
+                              await deleteDoc(doc(db, "posts", postId, "replies", reply.id));
+                              await updateDoc(doc(db, "posts", postId), {
+                                replies: increment(-1),
+                              });
+                              setReplies((prev) => prev.filter((r) => r.id !== reply.id));
+                            } catch (e) {
+                              console.error(e);
+                              alert("削除に失敗しました");
+                            }
+                          }}
+                            className="hover:text-red-500 transition">
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <p className="mt-2 text-white text-sm whitespace-pre-wrap break-words">{reply.text}</p>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </Layout>
