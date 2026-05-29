@@ -329,17 +329,18 @@ export default function PostCard({
     if (!currentUser) return;
     await addDoc(collection(db, "notifications"), {
       type: "report",
-      message: "クリートが通報されました",
+      message: `${currentUser.name}さんがクリートを通報しました`,
       postId: post.id,
       postText: post.text || "",
       postImage: post.image || "",
       reportedBy: currentUser.uid,
+      reportedByName: currentUser.name,
       targetUid: post.uid,
       readBy: [],
       createdAt: Date.now(),
     });
     await addDoc(collection(db, "reports"), {
-      postId: post.id, text: post.text, createdAt: Date.now(),
+      postId: post.id, text: post.text, reportedBy: currentUser.name, createdAt: Date.now(),
     });
     alert("通報しました");
     setOpen(false);

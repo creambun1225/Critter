@@ -174,10 +174,11 @@ export default function PostDetailPage() {
     if (!currentUser || !post) return;
     await addDoc(collection(db, "notifications"), {
       type: "report",
-      message: "クリートが通報されました",
+      message: `${currentUser.name}さんがクリートを通報しました`,
       postId: postId,
       postText: post.text || "",
       reportedBy: currentUser.uid,
+      reportedByName: currentUser.name,
       targetUid: post.uid,
       readBy: [],
       createdAt: Date.now(),
@@ -185,6 +186,7 @@ export default function PostDetailPage() {
     await addDoc(collection(db, "reports"), {
       postId: postId,
       text: post.text,
+      reportedBy: currentUser.name,
       createdAt: Date.now(),
     });
     alert("通報しました");
@@ -198,7 +200,7 @@ export default function PostDetailPage() {
       // リプライも削除
       const repliesDocs = await getDocs(collection(db, "posts", postId, "replies"));
       for (const rDoc of repliesDocs.docs) {
-        await rDoc.ref.delete();
+        await deleteDoc(rDoc.ref);
       }
       await deleteDoc(doc(db, "posts", postId));
       router.push("/");
