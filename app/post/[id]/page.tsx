@@ -249,21 +249,21 @@ export default function PostDetailPage() {
 
             {/* アクション */}
             <div className="flex justify-between mt-6 max-w-md text-zinc-500">
-              <span className="flex items-center gap-2">{post.replies || 0}</span>
-              <span className="flex items-center gap-2">{post.reposts || 0}</span>
-              <span className="flex items-center gap-2">{post.likes || 0}</span>
-              <span className="flex items-center gap-2">{post.bookmarks || 0}</span>
-              <span className="flex items-center gap-2 text-zinc-600">{impressions.toLocaleString()}</span>
+              <span className="flex items-center gap-2"><img src="/reply.png" className="w-5 h-5" /> {post.replies || 0}</span>
+              <span className="flex items-center gap-2"><img src="/repost.png" className="w-5 h-5" /> {post.reposts || 0}</span>
+              <span className="flex items-center gap-2"><img src={post.likedUsers?.includes(currentUser?.uid) ? "/like-active.png" : "/like-inactive.png"} className="w-5 h-5" /> {post.likes || 0}</span>
+              <span className="flex items-center gap-2"><img src={post.bookmarkedUsers?.includes(currentUser?.uid) ? "/bookmark-active.png" : "/bookmark-inactive.png"} className="w-5 h-5" /> {post.bookmarks || 0}</span>
+              <span className="flex items-center gap-2 text-zinc-600"><img src="/impression.png" className="w-5 h-5" /> {impressions.toLocaleString()}</span>
             </div>
 
             {/* ボタン */}
             <div className="flex justify-between mt-4 pt-4 border-t border-zinc-800 max-w-md text-zinc-500">
-              <button onClick={submitReply} className="hover:text-sky-400 flex items-center gap-2 transition">💬</button>
-              <button onClick={repostPost} className={`flex items-center gap-2 transition ${isReposted ? "text-green-400" : "hover:text-green-400"}`}>🔁</button>
-              <button onClick={likePost} className={`flex items-center gap-2 transition ${isLiked ? "text-pink-400" : "hover:text-pink-400"}`}>❤️</button>
-              <button onClick={bookmarkPost} className={`flex items-center gap-2 transition ${isBookmarked ? "text-yellow-400" : "hover:text-yellow-400"}`}>🔖</button>
-              <button onClick={reportPost} className="hover:text-red-400 flex items-center gap-2 transition">⚠️</button>
-              {isOwner && <button onClick={deletePost} className="hover:text-red-500 flex items-center gap-2 transition">🗑️</button>}
+              <button onClick={submitReply} className="hover:opacity-70 flex items-center gap-2 transition"><img src="/reply.png" className="w-5 h-5" /></button>
+              <button onClick={repostPost} className="hover:opacity-70 flex items-center gap-2 transition"><img src="/repost.png" className="w-5 h-5" /></button>
+              <button onClick={likePost} className="hover:opacity-70 flex items-center gap-2 transition"><img src={isLiked ? "/like-active.png" : "/like-inactive.png"} className="w-5 h-5" /></button>
+              <button onClick={bookmarkPost} className="hover:opacity-70 flex items-center gap-2 transition"><img src={isBookmarked ? "/bookmark-active.png" : "/bookmark-inactive.png"} className="w-5 h-5" /></button>
+              <button onClick={reportPost} className="hover:opacity-70 flex items-center gap-2 transition"><span>⚠️</span></button>
+              {isOwner && <button onClick={deletePost} className="hover:opacity-70 flex items-center gap-2 transition"><span>🗑️</span></button>}
             </div>
           </div>
         </div>
@@ -317,7 +317,7 @@ export default function PostDetailPage() {
                       {/* リプライのアクションボタン */}
                       <div className="flex justify-between mt-3 max-w-md text-zinc-500">
                         {/* 返信 */}
-                        <span className="flex items-center gap-1.5 text-sm">💬 0</span>
+                        <span className="flex items-center gap-1.5 text-sm"><img src="/reply.png" className="w-4 h-4" /> 0</span>
 
                         {/* リクリート */}
                         <button onClick={async () => {
@@ -337,8 +337,8 @@ export default function PostDetailPage() {
                             )
                           );
                         }}
-                          className={`flex items-center gap-1.5 text-sm transition ${isReplyReposted ? "text-green-400" : "hover:text-green-400"}`}>
-                          🔁 {reply.repostedUsers?.length || 0}
+                          className="hover:opacity-70 flex items-center gap-1.5 text-sm transition">
+                          <img src="/repost.png" className="w-4 h-4" /> {reply.repostedUsers?.length || 0}
                         </button>
 
                         {/* いいね */}
@@ -359,15 +359,15 @@ export default function PostDetailPage() {
                             )
                           );
                         }}
-                          className={`flex items-center gap-1.5 text-sm transition ${isReplyLiked ? "text-pink-400" : "hover:text-pink-400"}`}>
-                          ❤️ {reply.likedUsers?.length || 0}
+                          className="hover:opacity-70 flex items-center gap-1.5 text-sm transition">
+                          <img src={isReplyLiked ? "/like-active.png" : "/like-inactive.png"} className="w-4 h-4" /> {reply.likedUsers?.length || 0}
                         </button>
 
                         {/* ブックマーク（非表示） */}
-                        <span className="flex items-center gap-1.5 text-sm">🔖 0</span>
+                        <span className="flex items-center gap-1.5 text-sm"><img src="/bookmark-inactive.png" className="w-4 h-4" /> 0</span>
 
                         {/* インプレッション */}
-                        <span className="flex items-center gap-1.5 text-sm text-zinc-600">📊 {replyImpressions}</span>
+                        <span className="flex items-center gap-1.5 text-sm text-zinc-600"><img src="/impression.png" className="w-4 h-4" /> {replyImpressions}</span>
                       </div>
                     </div>
                   </div>

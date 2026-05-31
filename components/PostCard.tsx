@@ -475,15 +475,15 @@ export default function PostCard({
             <div className="flex justify-between mt-5 max-w-md text-zinc-500">
 
               {/* 💬 リプライ */}
-              <Link href={`/post/${post.id}`} className="hover:text-sky-400 flex items-center gap-2 transition">
-                <span>💬</span><span>{post.replies || 0}</span>
+              <Link href={`/post/${post.id}`} className="hover:opacity-70 flex items-center gap-2 transition">
+                <img src="/reply.png" className="w-5 h-5" /><span className="text-sm">{post.replies || 0}</span>
               </Link>
 
               {/* 🔁 リクリート */}
               <div className="relative">
                 <button onClick={(e) => { e.preventDefault(); setShowRepostModal((p) => !p); }}
-                  className={`flex items-center gap-2 transition ${isReposted ? "text-green-400" : "hover:text-green-400"}`}>
-                  <span>🔁</span><span>{post.reposts || 0}</span>
+                  className="hover:opacity-70 flex items-center gap-2 transition">
+                  <img src="/repost.png" className="w-5 h-5" /><span className="text-sm">{post.reposts || 0}</span>
                 </button>
                 {showRepostModal && (
                   <RepostModal isReposted={isReposted} onClose={() => setShowRepostModal(false)}
@@ -493,19 +493,19 @@ export default function PostCard({
 
               {/* ❤️ いいね */}
               <button onClick={(e) => { e.preventDefault(); likePost(); }}
-                className={`flex items-center gap-2 transition ${isLiked ? "text-pink-400" : "hover:text-pink-400"}`}>
-                <span>❤️</span><span>{post.likes || 0}</span>
+                className="hover:opacity-70 flex items-center gap-2 transition">
+                <img src={isLiked ? "/like-active.png" : "/like-inactive.png"} className="w-5 h-5" /><span className="text-sm">{post.likes || 0}</span>
               </button>
 
               {/* 🔖 ブックマーク */}
               <button onClick={(e) => { e.preventDefault(); bookmarkPost(); }}
-                className={`flex items-center gap-2 transition ${isBookmarked ? "text-yellow-400" : "hover:text-yellow-400"}`}>
-                <span>🔖</span><span>{post.bookmarks || 0}</span>
+                className="hover:opacity-70 flex items-center gap-2 transition">
+                <img src={isBookmarked ? "/bookmark-active.png" : "/bookmark-inactive.png"} className="w-5 h-5" /><span className="text-sm">{post.bookmarks || 0}</span>
               </button>
 
               {/* 📊 インプレッション（ブックマークの右） */}
               <span className="flex items-center gap-1.5 text-zinc-600 text-sm select-none">
-                <span>📊</span>
+                <img src="/impression.png" className="w-5 h-5" />
                 <span>{impressions.toLocaleString()}</span>
               </span>
 
