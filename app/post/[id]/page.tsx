@@ -24,6 +24,8 @@ export default function PostDetailPage() {
   const [replying, setReplying] = useState(false);
 
   const [analyticsPost, setAnalyticsPost] = useState<any>(null);
+  const [replyMenuOpen, setReplyMenuOpen] = useState<string | null>(null);
+  const [replyAnalyticsPost, setReplyAnalyticsPost] = useState<any>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -68,6 +70,8 @@ export default function PostDetailPage() {
         verified: currentUser.verified || false,
         admin: currentUser.admin || false,
         likedUsers: [],
+        repostedUsers: [],
+        impressions: 0,
         createdAt: Date.now(),
       });
 
@@ -288,8 +292,10 @@ export default function PostDetailPage() {
         ) : (
           replies.map((reply) => {
             const isReplyLiked = reply.likedUsers?.includes(currentUser?.uid);
+            const isReplyReposted = reply.repostedUsers?.includes(currentUser?.uid);
             const isReplyOwner = currentUser?.uid === reply.uid;
             const canDeleteReply = isReplyOwner || currentUser?.admin;
+            const replyImpressions = (reply.likedUsers?.length || 0) + (reply.repostedUsers?.length || 0) + (reply.impressions || 0);
 
             return (
               <div key={reply.id} className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">
@@ -309,7 +315,33 @@ export default function PostDetailPage() {
                       <p className="mt-2 text-white text-sm whitespace-pre-wrap break-words">{reply.text}</p>
 
                       {/* リプライのアクションボタン */}
-                      <div className="flex justify-between mt-3 max-w-xs text-zinc-500 text-sm">
+                      <div className="flex justify-between mt-3 max-w-md text-zinc-500">
+                        {/* 返信 */}
+                        <span className="flex items-center gap-1.5 text-sm">💬 0</span>
+
+                        {/* リクリート */}
+                        <button onClick={async () => {
+                          if (!currentUser) return;
+                          const repostedUsers = reply.repostedUsers || [];
+                          const alreadyReposted = repostedUsers.includes(currentUser.uid);
+                          const newRepostedUsers = alreadyReposted
+                            ? repostedUsers.filter((id: string) => id !== currentUser.uid)
+                            : [...repostedUsers, currentUser.uid];
+                          const replyDocRef = doc(db, "posts", postId, "replies", reply.id);
+                          await updateDoc(replyDocRef, {
+                            repostedUsers: newRepostedUsers,
+                          });
+                          setReplies((prev) =>
+                            prev.map((r) =>
+                              r.id === reply.id ? { ...r, repostedUsers: newRepostedUsers } : r
+                            )
+                          );
+                        }}
+                          className={`flex items-center gap-1.5 text-sm transition ${isReplyReposted ? "text-green-400" : "hover:text-green-400"}`}>
+                          🔁 {reply.repostedUsers?.length || 0}
+                        </button>
+
+                        {/* いいね */}
                         <button onClick={async () => {
                           if (!currentUser) return;
                           const likedUsers = reply.likedUsers || [];
@@ -327,33 +359,103 @@ export default function PostDetailPage() {
                             )
                           );
                         }}
-                          className={`hover:text-pink-400 transition ${isReplyLiked ? "text-pink-400" : ""}`}>
+                          className={`flex items-center gap-1.5 text-sm transition ${isReplyLiked ? "text-pink-400" : "hover:text-pink-400"}`}>
                           ❤️ {reply.likedUsers?.length || 0}
                         </button>
 
-                        {canDeleteReply && (
-                          <button onClick={async () => {
-                            const ok = confirm("リプライを削除しますか？");
-                            if (!ok) return;
-                            try {
-                              await deleteDoc(doc(db, "posts", postId, "replies", reply.id));
-                              await updateDoc(doc(db, "posts", postId), {
-                                replies: increment(-1),
-                              });
-                              setReplies((prev) => prev.filter((r) => r.id !== reply.id));
-                            } catch (e) {
-                              console.error(e);
-                              alert("削除に失敗しました");
-                            }
-                          }}
-                            className="hover:text-red-500 transition">
-                            🗑️
-                          </button>
-                        )}
+                        {/* ブックマーク（非表示） */}
+                        <span className="flex items-center gap-1.5 text-sm">🔖 0</span>
+
+                        {/* インプレッション */}
+                        <span className="flex items-center gap-1.5 text-sm text-zinc-600">📊 {replyImpressions}</span>
                       </div>
                     </div>
                   </div>
+
+                  {/* ⋯ メニュー */}
+                  <div className="relative shrink-0">
+                    <button onClick={() => setReplyMenuOpen(replyMenuOpen === reply.id ? null : reply.id)}
+                      className="text-zinc-500 hover:text-white text-2xl px-2">⋯</button>
+                    {replyMenuOpen === reply.id && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setReplyMenuOpen(null)} />
+                        <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-56 z-50 shadow-2xl">
+                          {canDeleteReply && (
+                            <>
+                              <button onClick={() => {
+                                setReplyAnalyticsPost({ id: reply.id, ...reply });
+                                setReplyMenuOpen(null);
+                              }}
+                                className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-white flex items-center gap-2">
+                                <span>📊</span><span>アナリティクス</span>
+                              </button>
+                              <div className="border-t border-zinc-800" />
+                            </>
+                          )}
+                          <button onClick={async () => {
+                            if (!currentUser) return;
+                            await addDoc(collection(db, "notifications"), {
+                              type: "report",
+                              message: `${currentUser.name}さんがリプライを通報しました`,
+                              postId: postId,
+                              replyId: reply.id,
+                              postText: reply.text || "",
+                              reportedBy: currentUser.uid,
+                              reportedByName: currentUser.name,
+                              targetUid: reply.uid,
+                              readBy: [],
+                              createdAt: Date.now(),
+                            });
+                            alert("通報しました");
+                            setReplyMenuOpen(null);
+                          }}
+                            className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-400">
+                            このリプライを通報
+                          </button>
+                          {canDeleteReply && (
+                            <button onClick={async () => {
+                              const ok = confirm("リプライを削除しますか？");
+                              if (!ok) return;
+                              try {
+                                await deleteDoc(doc(db, "posts", postId, "replies", reply.id));
+                                await updateDoc(doc(db, "posts", postId), {
+                                  replies: increment(-1),
+                                });
+                                setReplies((prev) => prev.filter((r) => r.id !== reply.id));
+                              } catch (e) {
+                                console.error(e);
+                                alert("削除に失敗しました");
+                              }
+                              setReplyMenuOpen(null);
+                            }}
+                              className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-red-500 border-t border-zinc-800">
+                              リプライを削除
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
+
+                {/* リプライのアナリティクスモーダル */}
+                {replyAnalyticsPost?.id === reply.id && (
+                  <div className="mt-4 bg-zinc-900 rounded-2xl p-4">
+                    <div className="text-sm">
+                      <div className="flex gap-4">
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-pink-400">{reply.likedUsers?.length || 0}</div>
+                          <div className="text-xs text-zinc-500">いいね</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-green-400">{reply.repostedUsers?.length || 0}</div>
+                          <div className="text-xs text-zinc-500">リクリート</div>
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => setReplyAnalyticsPost(null)} className="mt-3 w-full bg-zinc-700 hover:bg-zinc-600 rounded-xl py-2 text-sm font-bold transition">閉じる</button>
+                  </div>
+                )}
               </div>
             );
           })
