@@ -126,24 +126,25 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
 
 function calcRecommendScore(post: any, currentUser: any): number {
   let score = 0;
-  score += (post.likes || 0) * 3;
-  score += (post.reposts || 0) * 4;
-  score += (post.replies || 0) * 2;
-  score += (post.bookmarks || 0) * 2;
+  
+  // エンゲージメント（各いいね削除で大きく変わらないようにする）
+  const likeScore = Math.min((post.likes || 0), 10) * 1;  // 最大10点
+  const repostScore = Math.min((post.reposts || 0), 8) * 1;  // 最大8点
+  const replyScore = Math.min((post.replies || 0), 5) * 1;  // 最大5点
+  const bookmarkScore = Math.min((post.bookmarks || 0), 5) * 1;  // 最大5点
+  
+  score += likeScore + repostScore + replyScore + bookmarkScore;
 
-  if (currentUser?.likedUsers && post.likedUsers) {
-    const likedByMe = post.likedUsers.includes(currentUser.uid);
-    if (!likedByMe) score += 5;
-  }
-
+  // フォロー中のユーザーなら加点
   const following: string[] = currentUser?.following || [];
-  if (following.includes(post.uid)) score += 8;
+  if (following.includes(post.uid)) score += 15;
 
+  // 新しい投稿ほど加点（24時間以内）
   const age = Date.now() - (post.createdAt || 0);
   const hoursOld = age / (1000 * 60 * 60);
-  if (hoursOld < 1) score += 10;
-  else if (hoursOld < 6) score += 7;
-  else if (hoursOld < 24) score += 3;
+  if (hoursOld < 1) score += 20;
+  else if (hoursOld < 6) score += 15;
+  else if (hoursOld < 24) score += 10;
 
   return score;
 }
