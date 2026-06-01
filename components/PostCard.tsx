@@ -464,6 +464,12 @@ export default function PostCard({
               </Link>
             )}
 
+            {post.video && (
+              <Link href={`/post/${post.id}`}>
+                <video src={post.video} className="mt-4 rounded-2xl max-h-[500px] object-cover border border-zinc-800 w-full" controls />
+              </Link>
+            )}
+
             {post.isQuoteRepost && <QuotePostCard post={post.quotePost ?? null} />}
 
             {/* アクションボタン */}

@@ -3,9 +3,9 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  collection, addDoc, query, orderBy,
+  collection, addDoc, query, orderBy, limit,
   onSnapshot, doc, getDoc, where,
-  getDocs, deleteDoc, limit,
+  getDocs, deleteDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
@@ -127,19 +127,16 @@ function AnalyticsModal({ post, onClose }: { post: any; onClose: () => void }) {
 function calcRecommendScore(post: any, currentUser: any): number {
   let score = 0;
   
-  // エンゲージメント（各いいね削除で大きく変わらないようにする）
-  const likeScore = Math.min((post.likes || 0), 10) * 1;  // 最大10点
-  const repostScore = Math.min((post.reposts || 0), 8) * 1;  // 最大8点
-  const replyScore = Math.min((post.replies || 0), 5) * 1;  // 最大5点
-  const bookmarkScore = Math.min((post.bookmarks || 0), 5) * 1;  // 最大5点
+  const likeScore = Math.min((post.likes || 0), 10) * 1;
+  const repostScore = Math.min((post.reposts || 0), 8) * 1;
+  const replyScore = Math.min((post.replies || 0), 5) * 1;
+  const bookmarkScore = Math.min((post.bookmarks || 0), 5) * 1;
   
   score += likeScore + repostScore + replyScore + bookmarkScore;
 
-  // フォロー中のユーザーなら加点
   const following: string[] = currentUser?.following || [];
   if (following.includes(post.uid)) score += 15;
 
-  // 新しい投稿ほど加点（24時間以内）
   const age = Date.now() - (post.createdAt || 0);
   const hoursOld = age / (1000 * 60 * 60);
   if (hoursOld < 1) score += 20;
@@ -152,13 +149,18 @@ function calcRecommendScore(post: any, currentUser: any): number {
 export default function Home() {
   const [text, setText] = useState("");
   const [image, setImage] = useState<File | null>(null);
+  const [video, setVideo] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [videoPreview, setVideoPreview] = useState<string>("");
   const [posts, setPosts] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [analyticsPost, setAnalyticsPost] = useState<any>(null);
   const [posting, setPosting] = useState(false);
   const [feedTab, setFeedTab] = useState<"following" | "recommended" | "latest">("recommended");
+  
+  const [mentions, setMentions] = useState<any[]>([]);
+  const [scheduledTime, setScheduledTime] = useState("");
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -166,6 +168,52 @@ export default function Home() {
     if (file.size > 5 * 1024 * 1024) { alert("画像は5MB以下にしてください"); return; }
     setImage(file);
     setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) { alert("動画は50MB以下にしてください"); return; }
+    setVideo(file);
+    setVideoPreview(URL.createObjectURL(file));
+  };
+
+  const handleTextChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setText(value);
+
+    const lastAt = value.lastIndexOf("@");
+    if (lastAt !== -1 && lastAt < e.target.selectionStart) {
+      const afterAt = value.substring(lastAt + 1, e.target.selectionStart);
+      const beforeSpace = afterAt.indexOf(" ");
+      
+      if (beforeSpace === -1 && afterAt.length > 0 && afterAt.length < 20) {
+        const q = query(
+          collection(db, "users"),
+          where("username", ">=", afterAt),
+          where("username", "<=", afterAt + "\uf8ff"),
+          limit(5)
+        );
+        try {
+          const snap = await getDocs(q);
+          setMentions(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
+        } catch (e) {
+          console.error(e);
+          setMentions([]);
+        }
+      } else {
+        setMentions([]);
+      }
+    } else {
+      setMentions([]);
+    }
+  };
+
+  const insertMention = (username: string) => {
+    const lastAt = text.lastIndexOf("@");
+    const newText = text.substring(0, lastAt) + "@" + username + " " + text.substring(lastAt + 1);
+    setText(newText);
+    setMentions([]);
   };
 
   useEffect(() => {
@@ -185,7 +233,7 @@ export default function Home() {
     const q = query(
       collection(db, "posts"),
       orderBy("createdAt", "desc"),
-      limit(50)  // 最新50件のみ取得して高速化
+      limit(50)
     );
     const unsub = onSnapshot(q, (snap) => {
       setPosts(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
@@ -202,7 +250,8 @@ export default function Home() {
 
     const filtered = posts.filter((p) =>
       !mutedUsers.includes(p.uid) &&
-      !blockedUsers.includes(p.uid)
+      !blockedUsers.includes(p.uid) &&
+      (!p.scheduledTime || new Date(p.scheduledTime) <= new Date())
     );
 
     if (feedTab === "following") {
@@ -219,12 +268,14 @@ export default function Home() {
   }, [posts, feedTab, currentUser]);
 
   const createPost = async () => {
-    if (!text.trim() && !image) return;
+    if (!text.trim() && !image && !video) return;
     if (posting) return;
     setPosting(true);
     try {
       let imageUrl = "";
+      let videoUrl = "";
       if (image) imageUrl = await fileToBase64(image);
+      if (video) videoUrl = await fileToBase64(video);
 
       const now = Date.now();
       const spamQuery = query(
@@ -244,9 +295,10 @@ export default function Home() {
 
       const hashtags = text.match(/#[^\s#]+/g)?.map((t) => t.slice(1)) || [];
 
-      await addDoc(collection(db, "posts"), {
+      const postData: any = {
         text,
         image: imageUrl,
+        video: videoUrl,
         hashtags,
         uid: currentUser.uid,
         name: userData?.name || "ユーザー",
@@ -258,11 +310,22 @@ export default function Home() {
         likedUsers: [], repostedUsers: [], bookmarkedUsers: [],
         impressions: 0,
         createdAt: Date.now(),
-      });
+      };
+
+      if (scheduledTime) {
+        postData.scheduledTime = new Date(scheduledTime).toISOString();
+        postData.isScheduled = true;
+      }
+
+      await addDoc(collection(db, "posts"), postData);
 
       setText("");
       setImage(null);
+      setVideo(null);
       setImagePreview("");
+      setVideoPreview("");
+      setScheduledTime("");
+      setMentions([]);
     } catch (e) {
       console.error(e);
       alert("投稿に失敗しました");
@@ -305,13 +368,28 @@ export default function Home() {
           src={userData?.icon || "/default.png"}
           className="w-12 h-12 rounded-full object-cover bg-zinc-700 flex-shrink-0"
         />
-        <div className="flex-1">
+        <div className="flex-1 relative">
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={handleTextChange}
             placeholder="いまどうしてる？"
             className="w-full bg-black outline-none resize-none text-lg min-h-[120px] text-white placeholder-zinc-600"
           />
+
+          {mentions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 bg-zinc-900 border border-zinc-700 rounded-xl mt-1 max-h-40 overflow-y-auto z-10">
+              {mentions.map((u) => (
+                <button
+                  key={u.uid}
+                  onClick={() => insertMention(u.username)}
+                  className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-sm text-white"
+                >
+                  @{u.username} {u.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           {imagePreview && (
             <div className="relative mt-3 inline-block">
               <img src={imagePreview} className="rounded-2xl max-h-[350px] object-cover" />
@@ -323,23 +401,61 @@ export default function Home() {
               </button>
             </div>
           )}
-          <div className="flex items-center justify-between mt-4">
-            <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-              🖼
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
-            </label>
-            <button
-              onClick={createPost}
-              disabled={posting || (!text.trim() && !image)}
-              className="bg-blue-500 hover:bg-blue-600 transition px-6 py-3 rounded-full text-lg font-bold disabled:opacity-40"
-            >
-              {posting ? "投稿中..." : "クリート"}
-            </button>
+
+          {videoPreview && (
+            <div className="relative mt-3 inline-block">
+              <video src={videoPreview} className="rounded-2xl max-h-[350px] object-cover" controls />
+              <button
+                onClick={() => { setVideo(null); setVideoPreview(""); }}
+                className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="mt-4">
+            <div className="text-xs text-zinc-500 mb-2">
+              {scheduledTime && `📅 ${new Date(scheduledTime).toLocaleString("ja-JP")}`}
+            </div>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex gap-2">
+                <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
+                  🖼
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                </label>
+                <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
+                  🎥
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoSelect}
+                    className="hidden"
+                  />
+                </label>
+                <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
+                  📅
+                  <input
+                    type="datetime-local"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              <button
+                onClick={createPost}
+                disabled={posting || (!text.trim() && !image && !video)}
+                className="bg-blue-500 hover:bg-blue-600 transition px-6 py-3 rounded-full text-lg font-bold disabled:opacity-40"
+              >
+                {posting ? "投稿中..." : "クリート"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
