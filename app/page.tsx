@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   collection, addDoc, query, orderBy,
   onSnapshot, doc, getDoc, where,
-  getDocs, deleteDoc,
+  getDocs, deleteDoc, limit,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
@@ -181,7 +181,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+    const q = query(
+      collection(db, "posts"),
+      orderBy("createdAt", "desc"),
+      limit(50)  // 最新50件のみ取得して高速化
+    );
     const unsub = onSnapshot(q, (snap) => {
       setPosts(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
     });

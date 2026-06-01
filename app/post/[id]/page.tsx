@@ -225,7 +225,7 @@ export default function PostDetailPage() {
   const isReposted = post.repostedUsers?.includes(currentUser?.uid);
   const isBookmarked = post.bookmarkedUsers?.includes(currentUser?.uid);
   const isOwner = currentUser?.uid === post.uid;
-  const impressions = (post.likes || 0) + (post.reposts || 0) + (post.replies || 0) + (post.bookmarks || 0) + (post.impressions || 0);
+  const impressions = post.impressions || 0;
 
   return (
     <Layout currentUser={currentUser}>
@@ -295,7 +295,7 @@ export default function PostDetailPage() {
             const isReplyReposted = reply.repostedUsers?.includes(currentUser?.uid);
             const isReplyOwner = currentUser?.uid === reply.uid;
             const canDeleteReply = isReplyOwner || currentUser?.admin;
-            const replyImpressions = (reply.likedUsers?.length || 0) + (reply.repostedUsers?.length || 0) + (reply.impressions || 0);
+            const replyImpressions = reply.impressions || 0;
 
             return (
               <div key={reply.id} className="border-b border-zinc-800 p-4 hover:bg-zinc-950 transition">

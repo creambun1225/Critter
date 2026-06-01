@@ -121,7 +121,7 @@ function RepostModal({
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-0 top-10 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-64 z-50 shadow-2xl">
+      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-64 z-50 shadow-2xl">
         <button onClick={() => { onRepost(); onClose(); }} className="w-full text-left px-4 py-3 hover:bg-zinc-900 flex items-center gap-3">
           <span className="text-xl">🔁</span>
           <div>
@@ -317,12 +317,7 @@ export default function PostCard({
   const canDelete = isOwner || currentUser?.admin;
 
   // インプレッション数（エンゲージメント合計）
-  const impressions =
-    (post.likes || 0) +
-    (post.reposts || 0) +
-    (post.replies || 0) +
-    (post.bookmarks || 0) +
-    (post.impressions || 0);
+  const impressions = post.impressions || 0;
 
   // 通報
   const reportPost = async () => {
