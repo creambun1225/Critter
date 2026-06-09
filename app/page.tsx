@@ -217,15 +217,28 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) { location.href = "/login"; return; }
-      const snap = await getDoc(doc(db, "users", user.uid));
-      if (snap.exists()) {
-        const data = snap.data();
-        setCurrentUser({ uid: user.uid, email: user.email, ...data });
-        setUserData(data);
+    const checkBAN = async (user: any) => {
+      if (!user) return;
+      
+      try {
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        if (userSnap.exists() && userSnap.data().banned) {
+          localStorage.setItem("critter_ban_status", "true");
+          location.href = "/banned";
+        } else {
+          localStorage.removeItem("critter_ban_status");
+        }
+      } catch (e) {
+        console.error("BAN check error:", e);
+      }
+    };
+
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        checkBAN(user);
       }
     });
+
     return () => unsub();
   }, []);
 
@@ -392,7 +405,7 @@ export default function Home() {
 
           {imagePreview && (
             <div className="relative mt-3 inline-block">
-              <img src={imagePreview} className="rounded-2xl max-h-[350px] object-cover" />
+              <img src={imagePreview} className="rounded-2xl max-h-[200px] object-cover" />
               <button
                 onClick={() => { setImage(null); setImagePreview(""); }}
                 className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm"
@@ -404,7 +417,7 @@ export default function Home() {
 
           {videoPreview && (
             <div className="relative mt-3 inline-block">
-              <video src={videoPreview} className="rounded-2xl max-h-[350px] object-cover" controls />
+              <video src={videoPreview} className="rounded-2xl max-h-[200px] object-cover" controls />
               <button
                 onClick={() => { setVideo(null); setVideoPreview(""); }}
                 className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm"
@@ -414,14 +427,18 @@ export default function Home() {
             </div>
           )}
 
-          <div className="mt-4">
-            <div className="text-xs text-zinc-500 mb-2">
-              {scheduledTime && `📅 ${new Date(scheduledTime).toLocaleString("ja-JP")}`}
+          {scheduledTime && (
+            <div className="mt-3 p-2 bg-zinc-900 rounded-xl text-sm text-blue-400">
+              📅 予約投稿: {new Date(scheduledTime).toLocaleString("ja-JP")}
             </div>
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex gap-2">
-                <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-                  🖼
+          )}
+
+          <div className="mt-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex gap-3">
+                {/* 画像ボタン */}
+                <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
+                  🖼️ 画像
                   <input
                     type="file"
                     accept="image/*"
@@ -429,8 +446,10 @@ export default function Home() {
                     className="hidden"
                   />
                 </label>
-                <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-                  🎥
+
+                {/* 動画ボタン */}
+                <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
+                  🎥 動画
                   <input
                     type="file"
                     accept="video/*"
@@ -438,8 +457,10 @@ export default function Home() {
                     className="hidden"
                   />
                 </label>
-                <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-                  📅
+
+                {/* 予約投稿ボタン */}
+                <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
+                  📅 予約
                   <input
                     type="datetime-local"
                     value={scheduledTime}
@@ -448,10 +469,11 @@ export default function Home() {
                   />
                 </label>
               </div>
+
               <button
                 onClick={createPost}
                 disabled={posting || (!text.trim() && !image && !video)}
-                className="bg-blue-500 hover:bg-blue-600 transition px-6 py-3 rounded-full text-lg font-bold disabled:opacity-40"
+                className="bg-blue-500 hover:bg-blue-600 transition px-6 py-2 rounded-full font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {posting ? "投稿中..." : "クリート"}
               </button>
