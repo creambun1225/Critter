@@ -27,7 +27,7 @@ export default function BanAppealPage() {
         setCurrentUser({ uid: user.uid, ...userSnap.data() });
       }
 
-      // 前回の異議申し立てを確認
+      // 前回の異議申し立てを確認（最新のものを取得）
       const q = query(
         collection(db, "ban_appeals"),
         where("uid", "==", user.uid)
@@ -38,8 +38,15 @@ export default function BanAppealPage() {
           (a, b) => b.data().createdAt - a.data().createdAt
         )[0];
         const data = latestAppeal.data();
-        setAppealStatus(data.status);
-        setAppealResponse(data.response || "");
+        
+        // 対応済みの appeal のみを表示
+        if (data.status && data.status !== "pending") {
+          setAppealStatus(data.status);
+          setAppealResponse(data.response || "");
+        } else {
+          // 未対応の場合は、form を表示する状態にする
+          setAppealStatus("pending");
+        }
       }
 
       setLoading(false);
