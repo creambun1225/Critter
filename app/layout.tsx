@@ -1,4 +1,5 @@
 import "./globals.css";
+import MaintenanceGate from "@/components/MaintenanceGate";
 
 export const metadata = {
   title: "Critter"
@@ -48,8 +49,11 @@ export default function RootLayout({
           }}
         />
       </head>
+
       <body>
-        {children}
+        <MaintenanceGate>
+          {children}
+        </MaintenanceGate>
       </body>
     </html>
   );
