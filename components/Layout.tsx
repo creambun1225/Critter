@@ -1,518 +1,245 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { auth } from "@/lib/firebase";
 
-import {
-  usePathname,
-} from "next/navigation";
-
-import {
-  useEffect,
-  useState,
-  useRef,
-} from "react";
-
-import {
-  db,
-  auth,
-} from "@/lib/firebase";
-
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  orderBy,
-  limit,
-  addDoc,
-  getDocs,
-} from "firebase/firestore";
-
-import {
-  signOut,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
-
-// ───────────────────────────────────────
-// 投稿モーダル
-// ───────────────────────────────────────
-function PostModal({
-  currentUser,
-  onClose,
-}: {
-  currentUser: any;
-  onClose: () => void;
-}) {
-  const [text, setText] = useState("");
-  const [image, setImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState("");
-  const [posting, setPosting] = useState(false);
-  const MAX = 280;
-  const remaining = MAX - text.length;
-  const canSubmit = (text.trim().length > 0 || image) && remaining >= 0 && !posting;
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert("画像は5MB以下にしてください"); return; }
-    setImage(file);
-    setImagePreview(URL.createObjectURL(file));
-  };
-
-  const handleSubmit = async () => {
-    if (!currentUser || !canSubmit) return;
-    setPosting(true);
-    try {
-      let imageUrl = "";
-      if (image) {
-        imageUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(image);
-        });
-      }
-      const hashtags = text.match(/#[^\s#]+/g)?.map((t) => t.slice(1)) || [];
-      await addDoc(collection(db, "posts"), {
-        text, image: imageUrl, hashtags,
-        uid: currentUser.uid,
-        name: currentUser.name || "ユーザー",
-        username: currentUser.username || "user",
-        icon: currentUser.icon || "",
-        verified: currentUser.verified || false,
-        admin: currentUser.admin || false,
-        replies: 0, reposts: 0, likes: 0, bookmarks: 0,
-        likedUsers: [], repostedUsers: [], bookmarkedUsers: [],
-        createdAt: Date.now(),
-      });
-
-      const mentions = text.match(/@([a-zA-Z0-9_]+)/g);
-      if (mentions) {
-        const usernames = [...new Set(mentions.map((m) => m.slice(1)))];
-        for (const username of usernames) {
-          if (username === currentUser.username) continue;
-          const q = query(collection(db, "users"), where("username", "==", username));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            await addDoc(collection(db, "notifications"), {
-              type: "mention",
-              toUid: snap.docs[0].id,
-              fromUid: currentUser.uid,
-              fromName: currentUser.name,
-              fromIcon: currentUser.icon ?? "",
-              fromUsername: currentUser.username,
-              postText: text,
-              readBy: [],
-              createdAt: Date.now(),
-            });
-          }
-        }
-      }
-      onClose();
-    } catch (e) {
-      console.error(e);
-      alert("投稿に失敗しました");
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/70" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4">
-        <div className="w-full max-w-lg bg-black border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
-            <button onClick={onClose} className="text-zinc-400 hover:text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition">✕</button>
-            <button onClick={handleSubmit} disabled={!canSubmit} className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm px-5 py-2 rounded-full disabled:opacity-40 transition">
-              {posting ? "投稿中..." : "クリート"}
-            </button>
-          </div>
-          <div className="flex gap-3 p-4 overflow-y-auto flex-1">
-            <img src={currentUser?.icon || "/default.png"} className="w-11 h-11 rounded-full object-cover bg-zinc-700 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="いまどうしてる？" rows={5}
-                className="w-full bg-transparent text-white placeholder-zinc-600 resize-none outline-none text-xl leading-relaxed" />
-              {imagePreview && (
-                <div className="relative mt-3 inline-block">
-                  <img src={imagePreview} className="rounded-2xl max-h-[250px] object-cover" />
-                  <button onClick={() => { setImage(null); setImagePreview(""); }}
-                    className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm">✕</button>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800 shrink-0">
-            <label className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-2xl">
-              🖼
-              <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
-            </label>
-            <span className={`text-sm font-medium ${remaining < 0 ? "text-red-500" : remaining < 20 ? "text-yellow-500" : "text-zinc-500"}`}>{remaining}</span>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ───────────────────────────────────────
-// メイン Layout
-// ───────────────────────────────────────
-export default function Layout({
-  children,
-  currentUser
-}: {
+interface LayoutProps {
   children: React.ReactNode;
   currentUser?: any;
-}) {
+  onAccountSwitch?: (uid: string) => void;
+}
 
+export default function Layout({ children, currentUser, onAccountSwitch }: LayoutProps) {
   const pathname = usePathname();
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const [notificationCount, setNotificationCount] = useState(0);
-  const [trends, setTrends] = useState<{ tag: string; count: number }[]>([]);
-  const [showAccountMenu, setShowAccountMenu] = useState(false);
-  const [showPostModal, setShowPostModal] = useState(false);
-  const [recommendedUsers, setRecommendedUsers] = useState<any[]>([]);
-
-  const [switchTarget, setSwitchTarget] = useState<any>(null);
-  const [password, setPassword] = useState("");
-  const [switchError, setSwitchError] = useState("");
-  const [switchLoading, setSwitchLoading] = useState(false);
-
-  const [savedAccounts, setSavedAccounts] = useState<
-    { uid: string; name: string; username: string; icon: string; email: string }[]
-  >([]);
-
-  // おすすめユーザー取得
-  useEffect(() => {
-    const fetchRecommended = async () => {
-      const targets = ["creambun", "critter_Official"];
-      const results: any[] = [];
-      for (const username of targets) {
-        const q = query(collection(db, "users"), where("username", "==", username));
-        const snap = await getDocs(q);
-        if (!snap.empty) results.push({ uid: snap.docs[0].id, ...snap.docs[0].data() });
-      }
-      setRecommendedUsers(results);
-    };
-    fetchRecommended();
-  }, []);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("critter_accounts");
-      if (raw) setSavedAccounts(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (!currentUser?.uid || !currentUser?.email) return;
-    try {
-      const raw = localStorage.getItem("critter_accounts");
-      const existing: any[] = raw ? JSON.parse(raw) : [];
-      const filtered = existing.filter((a) => a.uid !== currentUser.uid);
-      const updated = [
-        { uid: currentUser.uid, name: currentUser.name || "ユーザー", username: currentUser.username || "user", icon: currentUser.icon || "", email: currentUser.email || "" },
-        ...filtered,
-      ].slice(0, 5);
-      localStorage.setItem("critter_accounts", JSON.stringify(updated));
-      setSavedAccounts(updated);
-    } catch {}
-  }, [currentUser?.uid]);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowAccountMenu(false);
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    try {
-      const raw = localStorage.getItem("critter_accounts");
-      const existing: any[] = raw ? JSON.parse(raw) : [];
-      localStorage.setItem("critter_accounts", JSON.stringify(existing.filter((a) => a.uid !== currentUser?.uid)));
-    } catch {}
-    location.href = "/login";
-  };
-
-  const openSwitchModal = (account: any) => {
-    setSwitchTarget(account); setPassword(""); setSwitchError(""); setShowAccountMenu(false);
-  };
-
-  const handleSwitch = async () => {
-    if (!switchTarget || !password) return;
-    setSwitchLoading(true); setSwitchError("");
-    try {
-      await signOut(auth);
-      await signInWithEmailAndPassword(auth, switchTarget.email, password);
-      setSwitchTarget(null); setPassword("");
-      location.href = "/";
-    } catch (e: any) {
-      const code = e?.code || "";
-      if (code === "auth/wrong-password" || code === "auth/invalid-credential") setSwitchError("パスワードが間違っています");
-      else if (code === "auth/too-many-requests") setSwitchError("試行回数が多すぎます。しばらくしてから再試行してください");
-      else setSwitchError("切り替えに失敗しました");
-    } finally {
-      setSwitchLoading(false);
+    const stored = localStorage.getItem("critter_accounts");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setAccounts(Array.isArray(parsed) ? parsed : []);
+      } catch {}
     }
-  };
-
-  // 通知バッジ
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-    let personalUnread = 0;
-    let reportUnread = 0;
-
-    const personalQ = query(
-      collection(db, "notifications"),
-      where("toUid", "==", currentUser.uid)
-    );
-    const unsubPersonal = onSnapshot(personalQ, (snap) => {
-      personalUnread = 0;
-      snap.docs.forEach((d: any) => {
-        const readBy: string[] = d.data().readBy || [];
-        if (!readBy.includes(currentUser.uid)) personalUnread++;
-      });
-      setNotificationCount(personalUnread + reportUnread);
-    });
-
-    let unsubReport: (() => void) | null = null;
-    if (currentUser.admin) {
-      const reportQ = query(
-        collection(db, "notifications"),
-        where("type", "==", "report")
-      );
-      unsubReport = onSnapshot(reportQ, (snap) => {
-        reportUnread = 0;
-        snap.docs.forEach((d: any) => {
-          const readBy: string[] = d.data().readBy || [];
-          if (!readBy.includes(currentUser.uid)) reportUnread++;
-        });
-        setNotificationCount(personalUnread + reportUnread);
-      });
-    }
-    return () => {
-      unsubPersonal();
-      if (unsubReport) unsubReport();
-    };
-  }, [currentUser?.uid, currentUser?.admin]);
-
-  // トレンド集計
-  useEffect(() => {
-    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(20));
-    const unsub = onSnapshot(q, (snap) => {
-      const tagCount: Record<string, number> = {};
-      const stopWords = new Set(["の","に","は","を","が","で","と","た","て","も","な","い","る","し","れ","さ","ん","だ","か","ら","や","よ","ね","わ","け","ど","あ","う","え","お","http","https","www","rt","the","a","an","is","in","it","of","to","and","or","for"]);
-      snap.docs.forEach((d: any) => {
-        const normalized = (d.data().text || "").replace(/#/g, "");
-        normalized.split(/[\s\u3000、。！？!?,.]+/).map((w: string) => w.toLowerCase().trim())
-          .filter((w: string) => w.length >= 2 && !stopWords.has(w) && !/^\d+$/.test(w))
-          .forEach((word: string) => { tagCount[word] = (tagCount[word] || 0) + 1; });
-      });
-      setTrends(Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag, count]) => ({ tag, count })));
-    });
-    return () => unsub();
   }, []);
+
+  const switchAccount = (uid: string) => {
+    if (onAccountSwitch) {
+      onAccountSwitch(uid);
+    }
+    setMenuOpen(false);
+    // ページリロードして新しいアカウントデータを取得
+    setTimeout(() => {
+      location.reload();
+    }, 100);
+  };
 
   const menus = [
-    { href: "/",                         icon: "/icon-home.png",         label: "ホーム",       badge: false },
-    { href: "/search",                   icon: "/icon-search.png",       label: "検索",         badge: false },
-    { href: "/notifications",            icon: "/icon-notification.png", label: "通知",         badge: true  },
-    { href: `/user/${currentUser?.uid}`, icon: "/icon-profile.png",      label: "プロフィール", badge: false },
-    { href: "/bookmarks",                icon: "/icon-bookmarks.png",    label: "ブックマーク", badge: false },
-    { href: "/settings",                 icon: "/icon-settings.png",     label: "設定",         badge: false },
+    { icon: "/icon-home.png", label: "ホーム", href: "/" },
+    { icon: "/icon-search.png", label: "検索", href: "/search" },
+    { icon: "/icon-notification.png", label: "通知", href: "/notifications", badge: true },
+    { icon: "/icon-profile.png", label: "プロフィール", href: currentUser?.uid ? `/user/${currentUser.uid}` : "#" },
+    { icon: "/icon-bookmarks.png", label: "ブックマーク", href: "/bookmarks" },
+    { icon: "/icon-settings.png", label: "設定", href: "/settings" },
   ];
 
-  const otherAccounts = savedAccounts.filter((a) => a.uid !== currentUser?.uid);
+  const isHome = pathname === "/";
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   return (
-    // ── 全体: 画面高さに固定・横スクロール禁止
-    <div className="bg-black text-white h-screen flex justify-center overflow-hidden">
-      <div className="w-full max-w-7xl flex h-full">
+    <div className="min-h-screen bg-black text-white flex flex-col md:grid md:grid-cols-[280px_1fr_350px] gap-0">
+      {/* 左メニュー（PC） */}
+      <aside className="hidden md:flex flex-col sticky top-0 h-screen bg-black border-r border-zinc-800 px-4 py-4 overflow-y-auto">
+        <Link href="/" className="flex items-center gap-2 mb-8 hover:opacity-80 transition">
+          <img src="/logo.png" className="w-10 h-10 rounded-full" alt="Critter" />
+          <span className="text-2xl font-bold">Critter</span>
+        </Link>
 
-        {/* 左メニュー（固定・スクロールしない） */}
-        <div className="hidden md:flex w-[275px] h-full flex-col border-r border-zinc-800 px-4 py-3 flex-shrink-0">
+        <nav className="flex-1 space-y-4">
+          {menus.map((menu) => (
+            <Link
+              key={menu.href}
+              href={menu.href}
+              className={`flex items-center gap-4 px-4 py-3 rounded-full transition ${
+                pathname === menu.href
+                  ? "bg-zinc-900 text-white font-bold"
+                  : "text-zinc-300 hover:bg-zinc-900"
+              }`}
+            >
+              <img src={menu.icon} className="w-6 h-6" alt={menu.label} />
+              <span className="text-xl">{menu.label}</span>
+              {menu.badge && currentUser?.unreadNotifications && (
+                <span className="ml-auto bg-blue-500 rounded-full min-w-[18px] h-[18px] text-xs flex items-center justify-center leading-none">
+                  {currentUser.unreadNotifications}
+                </span>
+              )}
+            </Link>
+          ))}
+        </nav>
 
-          <Link href="/" className="w-14 h-14 rounded-full hover:bg-zinc-900 flex items-center justify-center mb-4 overflow-hidden shrink-0">
-            <img src="/logo.png" className="w-full h-full object-cover" />
-          </Link>
+        <div className="border-t border-zinc-800 pt-4 space-y-3">
+          <div className="text-xs text-zinc-500 mb-2">アカウント</div>
+          {accounts.map((acc) => (
+            <button
+              key={acc.uid}
+              onClick={() => switchAccount(acc.uid)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-full transition text-left ${
+                currentUser?.uid === acc.uid
+                  ? "bg-zinc-800"
+                  : "hover:bg-zinc-900"
+              }`}
+            >
+              <img src={acc.icon || "/default.png"} className="w-8 h-8 rounded-full object-cover" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-bold truncate">{acc.name}</div>
+                <div className="text-xs text-zinc-500 truncate">@{acc.username}</div>
+              </div>
+              {currentUser?.uid === acc.uid && (
+                <span className="text-lg">✓</span>
+              )}
+            </button>
+          ))}
 
-          <div className="flex flex-col gap-1">
-            {menus.map((menu) => (
-              <Link key={menu.href} href={menu.href}
-                className={`flex items-center gap-5 px-5 py-4 rounded-full text-2xl font-bold transition hover:bg-zinc-900 ${pathname === menu.href ? "bg-zinc-900" : ""}`}>
-                <div className="relative w-8 h-8 shrink-0">
-                  <img src={menu.icon} alt={menu.label} className="w-8 h-8 object-contain" />
-                  {/* 通知バッジ：数字を表示 */}
-                  {menu.badge && notificationCount > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center font-bold leading-none">
-                      {notificationCount > 99 ? "99+" : notificationCount}
-                    </div>
-                  )}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-full flex items-center gap-2 px-4 py-3 rounded-full hover:bg-zinc-900 transition text-zinc-300"
+          >
+            <span className="text-2xl">☰</span>
+            <span>その他</span>
+          </button>
+
+          {menuOpen && (
+            <div className="bg-zinc-900 rounded-xl p-2 space-y-1">
+              <button
+                onClick={async () => {
+                  await auth.signOut();
+                  location.href = "/login";
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-zinc-800 rounded text-sm"
+              >
+                ログアウト
+              </button>
+              <Link
+                href="/settings"
+                className="block px-3 py-2 hover:bg-zinc-800 rounded text-sm"
+              >
+                アカウント設定
+              </Link>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* メインコンテンツ */}
+      <main className="flex-1 border-r border-zinc-800">
+        {children}
+      </main>
+
+      {/* 右カラム（PC） */}
+      <aside className="hidden lg:block sticky top-0 h-screen bg-black border-l border-zinc-800 px-4 py-4 overflow-y-auto">
+        {/* 検索 */}
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="検索"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-full px-4 py-2 text-sm outline-none focus:border-blue-500 transition"
+          />
+        </div>
+
+        {/* トレンド */}
+        <div className="bg-zinc-900 rounded-2xl p-4">
+          <h3 className="font-bold text-xl mb-4">トレンド</h3>
+          <div className="space-y-4">
+            <Link href="#" className="block hover:bg-zinc-800 px-3 py-2 rounded transition">
+              <div className="text-xs text-zinc-500">トレンド</div>
+              <div className="font-bold">いいね</div>
+              <div className="text-xs text-zinc-500">10.5K件</div>
+            </Link>
+          </div>
+        </div>
+
+        {/* おすすめユーザー */}
+        <div className="mt-6 bg-zinc-900 rounded-2xl p-4">
+          <h3 className="font-bold text-xl mb-4">おすすめユーザー</h3>
+          <div className="space-y-3">
+            {["creambun", "critter_Official"].map((user) => (
+              <Link key={user} href={`/user/${user}`} className="flex items-center justify-between hover:bg-zinc-800 px-3 py-2 rounded transition">
+                <div>
+                  <div className="font-bold text-sm">{user}</div>
+                  <div className="text-xs text-zinc-500">@{user}</div>
                 </div>
-                <span>{menu.label}</span>
+                <button className="bg-white text-black px-4 py-1 rounded-full font-bold text-sm hover:bg-zinc-200 transition">
+                  フォロー
+                </button>
               </Link>
             ))}
           </div>
+        </div>
+      </aside>
 
-          <button onClick={() => setShowPostModal(true)}
-            className="mt-6 bg-blue-500 hover:bg-blue-600 transition rounded-full py-4 text-xl font-bold shrink-0">
-            クリート
-          </button>
-
-          {/* アカウントメニュー */}
-          <div className="mt-auto relative" ref={menuRef}>
-            {showAccountMenu && (
-              <div className="absolute bottom-20 left-0 w-72 bg-black border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50">
-                <Link href={`/user/${currentUser?.uid}`} onClick={() => setShowAccountMenu(false)}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition">
-                  <img src={currentUser?.icon || "/default.png"} className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-white truncate">{currentUser?.name || "ユーザー"}</div>
-                    <div className="text-zinc-500 text-sm truncate">@{currentUser?.username || "user"}</div>
-                  </div>
-                  <span className="text-blue-400 text-xl shrink-0">✓</span>
-                </Link>
-                {otherAccounts.map((account) => (
-                  <button key={account.uid} onClick={() => openSwitchModal(account)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900 transition border-t border-zinc-800 w-full text-left">
-                    <img src={account.icon || "/default.png"} className="w-10 h-10 rounded-full object-cover bg-zinc-700 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-white truncate">{account.name}</div>
-                      <div className="text-zinc-500 text-sm truncate">@{account.username}</div>
+      {/* モバイル下メニュー */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex items-center justify-around px-2 py-2">
+        {menus.slice(0, 5).map((menu) => (
+          <Link key={menu.href} href={menu.href} className="flex-1 flex flex-col items-center gap-1">
+            <img src={menu.icon} className="w-6 h-6" alt={menu.label} />
+            <span className="text-xs">{menu.label}</span>
+          </Link>
+        ))}
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="flex-1 flex flex-col items-center gap-1 relative"
+        >
+          <span className="text-2xl">☰</span>
+          <span className="text-xs">その他</span>
+          {menuOpen && (
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setMenuOpen(false)}
+            />
+          )}
+          {menuOpen && (
+            <div className="absolute bottom-full right-0 bg-black border border-zinc-800 rounded-2xl overflow-hidden w-48 shadow-2xl z-50">
+              <div className="p-4 border-b border-zinc-800">
+                <p className="text-xs text-zinc-500 mb-3">アカウント切り替え</p>
+                {accounts.map((acc) => (
+                  <button
+                    key={acc.uid}
+                    onClick={() => switchAccount(acc.uid)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded text-left text-sm mb-2 transition ${
+                      currentUser?.uid === acc.uid
+                        ? "bg-zinc-800"
+                        : "hover:bg-zinc-900"
+                    }`}
+                  >
+                    <img src={acc.icon || "/default.png"} className="w-6 h-6 rounded-full object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold truncate">{acc.name}</div>
                     </div>
                   </button>
                 ))}
-                <div className="border-t border-zinc-800" />
-                <Link href="/login" onClick={() => setShowAccountMenu(false)} className="block px-4 py-3 hover:bg-zinc-900 transition text-white font-bold">既存のアカウントを追加</Link>
-                <div className="border-t border-zinc-800" />
-                <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition text-white font-bold">
-                  @{currentUser?.username || "user"} からログアウト
-                </button>
               </div>
-            )}
-            <button onClick={() => setShowAccountMenu((prev) => !prev)}
-              className="flex items-center gap-3 hover:bg-zinc-900 rounded-full p-3 transition w-full text-left">
-              <img src={currentUser?.icon || "/default.png"} className="w-12 h-12 rounded-full object-cover bg-zinc-700 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="font-bold truncate">{currentUser?.name || "ユーザー"}</div>
-                <div className="text-zinc-500 text-sm truncate">@{currentUser?.username || "user"}</div>
-              </div>
-              <span className="text-zinc-500 text-lg">···</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 真ん中（ここだけスクロール） */}
-        <main className="flex-1 border-r border-l border-zinc-800 h-full overflow-y-auto max-w-[700px] w-full">
-          {children}
-        </main>
-
-        {/* 右（固定・スクロールしない） */}
-        <div className="hidden xl:flex flex-col w-[350px] h-full flex-shrink-0 p-4 overflow-y-auto">
-          <div className="space-y-4">
-            <input placeholder="検索" className="w-full bg-zinc-900 rounded-full px-5 py-4 outline-none text-lg" />
-
-            {/* トレンド */}
-            <div className="bg-zinc-900 rounded-3xl overflow-hidden">
-              <div className="p-5 text-2xl font-bold border-b border-zinc-800">トレンド</div>
-              {trends.length === 0 ? (
-                <div className="p-5 text-zinc-500 text-sm">トレンドはまだありません</div>
-              ) : (
-                trends.map((trend, i) => (
-                  <Link key={i} href={`/search?q=${encodeURIComponent(trend.tag)}`}
-                    className="block p-5 hover:bg-zinc-800 transition cursor-pointer border-t border-zinc-800 first:border-t-0">
-                    <div className="text-zinc-500 text-sm">トレンド · {trend.count}件</div>
-                    <div className="font-bold text-xl">{trend.tag}</div>
-                  </Link>
-                ))
-              )}
+              <Link href="/settings" className="block px-4 py-3 hover:bg-zinc-900 text-sm border-b border-zinc-800">
+                アカウント設定
+              </Link>
+              <button
+                onClick={async () => {
+                  await auth.signOut();
+                  location.href = "/login";
+                }}
+                className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-sm text-red-400"
+              >
+                ログアウト
+              </button>
             </div>
+          )}
+        </button>
+      </nav>
 
-            {/* おすすめユーザー */}
-            <div className="bg-zinc-900 rounded-3xl overflow-hidden">
-              <div className="p-5 text-xl font-bold border-b border-zinc-800">おすすめユーザー</div>
-              {recommendedUsers.length === 0 ? (
-                <div className="p-5 text-zinc-500 text-sm">読み込み中...</div>
-              ) : (
-                recommendedUsers.map((user) => (
-                  <Link key={user.uid} href={`/user/${user.uid}`}
-                    className="flex items-center gap-3 p-4 hover:bg-zinc-800 transition border-t border-zinc-800 first:border-t-0">
-                    <img src={user.icon || "/default.png"} className="w-12 h-12 rounded-full object-cover bg-zinc-700 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <span className="font-bold text-white truncate">{user.name}</span>
-                        {user.verified && <img src="/verified-blue.png" className="w-4 h-4 shrink-0" />}
-                        {user.admin && <img src="/verified-gold.png" className="w-4 h-4 shrink-0" />}
-                      </div>
-                      <div className="text-zinc-500 text-sm truncate">@{user.username}</div>
-                      <div className="text-zinc-500 text-xs mt-0.5">フォロワー {(user.followers || []).length.toLocaleString()}人</div>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
-
-            <div className="text-zinc-500 text-sm px-2">Critter v1.0.7</div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* モバイル下メニュー */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex justify-around items-center py-3 md:hidden z-50">
-        {menus.map((menu) => (
-          <Link key={menu.href} href={menu.href} className="relative flex items-center justify-center w-10 h-10">
-            <img src={menu.icon} alt={menu.label} className="w-6 h-6 object-contain" />
-            {menu.badge && notificationCount > 0 && (
-              <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-[10px] min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center font-bold leading-none">
-                {notificationCount > 99 ? "99+" : notificationCount}
-              </div>
-            )}
-          </Link>
-        ))}
-      </div>
-
-      {/* 投稿モーダル */}
-      {showPostModal && <PostModal currentUser={currentUser} onClose={() => setShowPostModal(false)} />}
-
-      {/* アカウント切り替えモーダル */}
-      {switchTarget && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/70" onClick={() => { setSwitchTarget(null); setPassword(""); setSwitchError(""); }} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-            <div className="w-full max-w-sm bg-black border border-zinc-700 rounded-2xl shadow-2xl p-6">
-              <div className="flex items-center gap-3 mb-5">
-                <img src={switchTarget.icon || "/default.png"} className="w-12 h-12 rounded-full object-cover bg-zinc-700" />
-                <div>
-                  <div className="font-bold text-white">{switchTarget.name}</div>
-                  <div className="text-zinc-500 text-sm">@{switchTarget.username}</div>
-                </div>
-              </div>
-              <h2 className="font-bold text-white text-lg mb-1">パスワードを入力</h2>
-              <p className="text-zinc-500 text-sm mb-4">アカウントを切り替えるにはパスワードが必要です</p>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSwitch(); }}
-                placeholder="パスワード" autoFocus
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition mb-3" />
-              {switchError && <p className="text-red-500 text-sm mb-3">{switchError}</p>}
-              <div className="flex gap-3">
-                <button onClick={() => { setSwitchTarget(null); setPassword(""); setSwitchError(""); }}
-                  className="flex-1 border border-zinc-700 py-2.5 rounded-full font-bold hover:bg-zinc-900 transition">キャンセル</button>
-                <button onClick={handleSwitch} disabled={!password || switchLoading}
-                  className="flex-1 bg-white text-black py-2.5 rounded-full font-bold disabled:opacity-40 hover:bg-zinc-200 transition">
-                  {switchLoading ? "切り替え中..." : "切り替え"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
+      {/* モバイル用フッター補完 */}
+      <div className="md:hidden h-16" />
     </div>
   );
 }

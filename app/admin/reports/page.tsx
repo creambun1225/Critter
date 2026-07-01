@@ -24,6 +24,8 @@ interface BanAppeal {
   uid: string;
   status: string;
   createdAt: number;
+  userName?: string;
+  userIcon?: string;
 }
 
 export default function AdminReportsPage() {

@@ -158,6 +158,7 @@ export default function Home() {
   const [analyticsPost, setAnalyticsPost] = useState<any>(null);
   const [posting, setPosting] = useState(false);
   const [feedTab, setFeedTab] = useState<"following" | "recommended" | "latest">("recommended");
+  const [loading, setLoading] = useState(true);
   
   const [mentions, setMentions] = useState<any[]>([]);
   const [scheduledTime, setScheduledTime] = useState("");
@@ -216,6 +217,20 @@ export default function Home() {
     setMentions([]);
   };
 
+  // アカウント切り替え時に状態をリセット
+  const handleAccountSwitch = (uid: string) => {
+    // 状態をリセットして、useEffect で新しいユーザーデータを取得する
+    setCurrentUser(null);
+    setUserData(null);
+    setText("");
+    setImage(null);
+    setVideo(null);
+    setImagePreview("");
+    setVideoPreview("");
+    setScheduledTime("");
+    setMentions([]);
+  };
+
   useEffect(() => {
     const checkBAN = async (user: any) => {
       if (!user) return;
@@ -233,9 +248,30 @@ export default function Home() {
       }
     };
 
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        checkBAN(user);
+    setLoading(true);
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) { 
+        location.href = "/login"; 
+        setLoading(false);
+        return; 
+      }
+
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          setCurrentUser({ uid: user.uid, email: user.email, ...data });
+          setUserData(data);
+          await checkBAN(user);
+        } else {
+          console.error("User document does not exist");
+          location.href = "/login";
+        }
+      } catch (e) {
+        console.error("User data fetch error:", e);
+        alert("ユーザーデータの取得に失敗しました");
+      } finally {
+        setLoading(false);
       }
     });
 
@@ -283,6 +319,8 @@ export default function Home() {
   const createPost = async () => {
     if (!text.trim() && !image && !video) return;
     if (posting) return;
+    if (!currentUser) { alert("ユーザー情報を取得できません。ページを再読み込みしてください"); return; }
+
     setPosting(true);
     try {
       let imageUrl = "";
@@ -348,8 +386,17 @@ export default function Home() {
   };
 
   return (
-    <Layout currentUser={currentUser}>
+    <Layout currentUser={currentUser} onAccountSwitch={handleAccountSwitch}>
 
+      {loading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin text-4xl mb-4">🐦</div>
+            <p className="text-zinc-500">読み込み中...</p>
+          </div>
+        </div>
+      ) : (
+        <>
       <div className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800">
         <div className="p-4 pb-0">
           <div className="text-3xl md:text-4xl font-bold text-white">ホーム</div>
@@ -472,7 +519,7 @@ export default function Home() {
 
               <button
                 onClick={createPost}
-                disabled={posting || (!text.trim() && !image && !video)}
+                disabled={posting || (!text.trim() && !image && !video) || !currentUser}
                 className="bg-blue-500 hover:bg-blue-600 transition px-6 py-2 rounded-full font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {posting ? "投稿中..." : "クリート"}
@@ -501,6 +548,8 @@ export default function Home() {
 
       {analyticsPost && (
         <AnalyticsModal post={analyticsPost} onClose={() => setAnalyticsPost(null)} />
+      )}
+        </>
       )}
 
     </Layout>
