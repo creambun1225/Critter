@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -13,7 +14,7 @@ interface LayoutProps {
 
 export default function Layout({ children, currentUser, onAccountSwitch }: LayoutProps) {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
 
   useEffect(() => {
@@ -30,8 +31,6 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
     if (onAccountSwitch) {
       onAccountSwitch(uid);
     }
-    setMenuOpen(false);
-    // ページリロードして新しいアカウントデータを取得
     setTimeout(() => {
       location.reload();
     }, 100);
@@ -46,11 +45,8 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
     { icon: "/icon-settings.png", label: "設定", href: "/settings" },
   ];
 
-  const isHome = pathname === "/";
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col md:grid md:grid-cols-[280px_1fr_350px] gap-0">
+    <div className="min-h-screen bg-black text-white grid grid-cols-1 md:grid-cols-[280px_1fr_350px] gap-0">
       {/* 左メニュー（PC） */}
       <aside className="hidden md:flex flex-col sticky top-0 h-screen bg-black border-r border-zinc-800 px-4 py-4 overflow-y-auto">
         <Link href="/" className="flex items-center gap-2 mb-8 hover:opacity-80 transition">
@@ -71,25 +67,21 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
             >
               <img src={menu.icon} className="w-6 h-6" alt={menu.label} />
               <span className="text-xl">{menu.label}</span>
-              {menu.badge && currentUser?.unreadNotifications && (
-                <span className="ml-auto bg-blue-500 rounded-full min-w-[18px] h-[18px] text-xs flex items-center justify-center leading-none">
-                  {currentUser.unreadNotifications}
-                </span>
-              )}
             </Link>
           ))}
         </nav>
 
-        <div className="border-t border-zinc-800 pt-4 space-y-3">
-          <div className="text-xs text-zinc-500 mb-2">アカウント</div>
+        {/* アカウント部分 */}
+        <div className="border-t border-zinc-800 pt-4">
+          <p className="text-xs text-zinc-500 px-4 mb-2">アカウント</p>
           {accounts.map((acc) => (
             <button
               key={acc.uid}
               onClick={() => switchAccount(acc.uid)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-full transition text-left ${
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-full transition text-left mb-2 ${
                 currentUser?.uid === acc.uid
                   ? "bg-zinc-800"
-                  : "hover:bg-zinc-900"
+                  : "hover:bg-zinc-900 text-zinc-400"
               }`}
             >
               <img src={acc.icon || "/default.png"} className="w-8 h-8 rounded-full object-cover" />
@@ -97,44 +89,41 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
                 <div className="text-sm font-bold truncate">{acc.name}</div>
                 <div className="text-xs text-zinc-500 truncate">@{acc.username}</div>
               </div>
-              {currentUser?.uid === acc.uid && (
-                <span className="text-lg">✓</span>
-              )}
             </button>
           ))}
 
           <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="w-full flex items-center gap-2 px-4 py-3 rounded-full hover:bg-zinc-900 transition text-zinc-300"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="w-full flex items-center gap-2 px-4 py-3 rounded-full hover:bg-zinc-900 transition text-zinc-300 text-sm mt-2"
           >
-            <span className="text-2xl">☰</span>
-            <span>その他</span>
+            ☰ その他
           </button>
 
-          {menuOpen && (
-            <div className="bg-zinc-900 rounded-xl p-2 space-y-1">
+          {sidebarOpen && (
+            <div className="bg-zinc-900 rounded-xl p-2 mt-2 space-y-1">
+              <Link
+                href="/settings"
+                className="block px-3 py-2 hover:bg-zinc-800 rounded text-sm"
+                onClick={() => setSidebarOpen(false)}
+              >
+                アカウント設定
+              </Link>
               <button
                 onClick={async () => {
                   await auth.signOut();
                   location.href = "/login";
                 }}
-                className="w-full text-left px-3 py-2 hover:bg-zinc-800 rounded text-sm"
+                className="w-full text-left px-3 py-2 hover:bg-zinc-800 rounded text-sm text-red-400"
               >
                 ログアウト
               </button>
-              <Link
-                href="/settings"
-                className="block px-3 py-2 hover:bg-zinc-800 rounded text-sm"
-              >
-                アカウント設定
-              </Link>
             </div>
           )}
         </div>
       </aside>
 
       {/* メインコンテンツ */}
-      <main className="flex-1 border-r border-zinc-800">
+      <main className="border-r border-zinc-800">
         {children}
       </main>
 
@@ -181,48 +170,59 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
       </aside>
 
       {/* モバイル下メニュー */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex items-center justify-around px-2 py-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 flex items-center justify-around px-2 py-2 z-40">
         {menus.slice(0, 5).map((menu) => (
-          <Link key={menu.href} href={menu.href} className="flex-1 flex flex-col items-center gap-1">
+          <Link key={menu.href} href={menu.href} className="flex-1 flex flex-col items-center gap-1 py-2">
             <img src={menu.icon} className="w-6 h-6" alt={menu.label} />
             <span className="text-xs">{menu.label}</span>
           </Link>
         ))}
         <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="flex-1 flex flex-col items-center gap-1 relative"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="flex-1 flex flex-col items-center gap-1 py-2 relative"
         >
           <span className="text-2xl">☰</span>
           <span className="text-xs">その他</span>
-          {menuOpen && (
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setMenuOpen(false)}
-            />
-          )}
-          {menuOpen && (
-            <div className="absolute bottom-full right-0 bg-black border border-zinc-800 rounded-2xl overflow-hidden w-48 shadow-2xl z-50">
-              <div className="p-4 border-b border-zinc-800">
-                <p className="text-xs text-zinc-500 mb-3">アカウント切り替え</p>
-                {accounts.map((acc) => (
-                  <button
-                    key={acc.uid}
-                    onClick={() => switchAccount(acc.uid)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded text-left text-sm mb-2 transition ${
-                      currentUser?.uid === acc.uid
-                        ? "bg-zinc-800"
-                        : "hover:bg-zinc-900"
-                    }`}
-                  >
-                    <img src={acc.icon || "/default.png"} className="w-6 h-6 rounded-full object-cover" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold truncate">{acc.name}</div>
+        </button>
+
+        {sidebarOpen && (
+          <>
+            <div className="fixed inset-0 z-30 bg-black/70" onClick={() => setSidebarOpen(false)} />
+            <div className="absolute bottom-16 right-4 bg-black border border-zinc-700 rounded-2xl overflow-hidden w-64 z-50 shadow-2xl max-h-96 overflow-y-auto">
+              {accounts.length > 0 && (
+                <>
+                  <div className="p-4 border-b border-zinc-800">
+                    <p className="text-xs text-zinc-500 mb-3">アカウント切り替え</p>
+                    <div className="space-y-2">
+                      {accounts.map((acc) => (
+                        <button
+                          key={acc.uid}
+                          onClick={() => {
+                            switchAccount(acc.uid);
+                            setSidebarOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded text-left text-sm transition ${
+                            currentUser?.uid === acc.uid
+                              ? "bg-zinc-800"
+                              : "hover:bg-zinc-900"
+                          }`}
+                        >
+                          <img src={acc.icon || "/default.png"} className="w-6 h-6 rounded-full object-cover" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-bold truncate">{acc.name}</div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                  </button>
-                ))}
-              </div>
-              <Link href="/settings" className="block px-4 py-3 hover:bg-zinc-900 text-sm border-b border-zinc-800">
-                アカウント設定
+                  </div>
+                </>
+              )}
+              <Link
+                href="/settings"
+                onClick={() => setSidebarOpen(false)}
+                className="block px-4 py-3 hover:bg-zinc-900 text-sm border-b border-zinc-800"
+              >
+                ⚙️ アカウント設定
               </Link>
               <button
                 onClick={async () => {
@@ -231,11 +231,11 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
                 }}
                 className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-sm text-red-400"
               >
-                ログアウト
+                🚪 ログアウト
               </button>
             </div>
-          )}
-        </button>
+          </>
+        )}
       </nav>
 
       {/* モバイル用フッター補完 */}
