@@ -120,11 +120,18 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
             </div>
           )}
         </div>
+
+        {/* バージョン表記 */}
+        <div className="text-xs text-zinc-600 px-4 mt-4 pt-4 border-t border-zinc-800">
+          Critter v1.0.7
+        </div>
       </aside>
 
-      {/* メインコンテンツ */}
-      <main className="border-r border-zinc-800">
-        {children}
+      {/* メインコンテンツ（幅制限あり） */}
+      <main className="border-r border-zinc-800 flex justify-center">
+        <div className="w-full max-w-2xl border-r border-zinc-800">
+          {children}
+        </div>
       </main>
 
       {/* 右カラム（PC） */}
