@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, limit, getDocs, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, query, limit, getDocs, orderBy, where } from "firebase/firestore";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,6 +17,7 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [trends, setTrends] = useState<any[]>([]);
 
   useEffect(() => {
     const stored = localStorage.getItem("critter_accounts");
@@ -26,6 +27,41 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
         setAccounts(Array.isArray(parsed) ? parsed : []);
       } catch {}
     }
+  }, []);
+
+  // トレンド取得（直近1週間のハッシュタグ）
+  useEffect(() => {
+    const fetchTrends = async () => {
+      try {
+        const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const q = query(
+          collection(db, "posts"),
+          where("createdAt", ">", oneWeekAgo),
+          orderBy("createdAt", "desc"),
+          limit(100)
+        );
+        const snap = await getDocs(q);
+        
+        const hashtagMap = new Map<string, number>();
+        snap.docs.forEach((doc) => {
+          const hashtags = doc.data().hashtags || [];
+          hashtags.forEach((tag: string) => {
+            hashtagMap.set(tag, (hashtagMap.get(tag) || 0) + 1);
+          });
+        });
+
+        const topTrends = Array.from(hashtagMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([tag, count]) => ({ tag, count }));
+
+        setTrends(topTrends);
+      } catch (e) {
+        console.error("Trends fetch error:", e);
+      }
+    };
+
+    fetchTrends();
   }, []);
 
   const switchAccount = (uid: string) => {
@@ -49,7 +85,7 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
   return (
     <div className="min-h-screen bg-black text-white">
       {/* PC レイアウト */}
-      <div className="hidden md:grid md:grid-cols-3 gap-0 min-h-screen">
+      <div className="hidden md:grid md:grid-cols-[minmax(280px,1fr)_2fr_minmax(280px,1fr)] gap-0 min-h-screen">
         {/* 左メニュー */}
         <aside className="border-r border-zinc-800 flex flex-col sticky top-0 h-screen">
           <div className="flex-1 px-4 py-4 overflow-y-auto">
@@ -161,16 +197,17 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
           <div className="bg-zinc-900 rounded-2xl p-4">
             <h3 className="font-bold text-lg mb-4">トレンド</h3>
             <div className="space-y-4">
-              <Link href="/search?q=critter" className="block hover:bg-zinc-800 px-3 py-2 rounded transition">
-                <div className="text-xs text-zinc-500">話題</div>
-                <div className="font-bold">#critter</div>
-                <div className="text-xs text-zinc-500">5.2万件のクリート</div>
-              </Link>
-              <Link href="/search?q=anime" className="block hover:bg-zinc-800 px-3 py-2 rounded transition">
-                <div className="text-xs text-zinc-500">話題</div>
-                <div className="font-bold">アニメ</div>
-                <div className="text-xs text-zinc-500">1.2万件のクリート</div>
-              </Link>
+              {trends.length > 0 ? (
+                trends.map((trend) => (
+                  <Link key={trend.tag} href={`/search?q=%23${trend.tag}`} className="block hover:bg-zinc-800 px-3 py-2 rounded transition">
+                    <div className="text-xs text-zinc-500">話題</div>
+                    <div className="font-bold">#{trend.tag}</div>
+                    <div className="text-xs text-zinc-500">{trend.count}件のクリート</div>
+                  </Link>
+                ))
+              ) : (
+                <div className="text-xs text-zinc-500">トレンド情報を読み込み中...</div>
+              )}
             </div>
           </div>
 
@@ -178,16 +215,14 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
           <div className="mt-6 bg-zinc-900 rounded-2xl p-4">
             <h3 className="font-bold text-lg mb-4">おすすめユーザー</h3>
             <div className="space-y-3">
-              {/* Critter Official */}
               <div className="flex items-center justify-between hover:bg-zinc-800 px-3 py-2 rounded transition">
-                <Link href="/user/qF5xYZ8bVqN0P" className="min-w-0 flex-1">
+                <Link href="/user/critter_official" className="min-w-0 flex-1">
                   <div className="font-bold text-sm">Critter Official</div>
                   <div className="text-xs text-zinc-500">@critter_official</div>
                 </Link>
                 <button 
-                  onClick={async (e) => {
+                  onClick={(e) => {
                     e.preventDefault();
-                    // フォロー処理（必要に応じて実装）
                     alert("フォロー機能はユーザー個別ページで行ってください");
                   }}
                   className="bg-white text-black px-4 py-1 rounded-full font-bold text-sm hover:bg-zinc-200 transition shrink-0">
