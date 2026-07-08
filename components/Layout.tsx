@@ -85,9 +85,10 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
   return (
     <div className="min-h-screen bg-black text-white">
       {/* PC レイアウト */}
-      <div className="hidden md:grid md:grid-cols-[minmax(280px,1fr)_2fr_minmax(280px,1fr)] gap-0 min-h-screen">
-        {/* 左メニュー */}
-        <aside className="border-r border-zinc-800 flex flex-col sticky top-0 h-screen">
+      <div className="hidden md:flex justify-center min-h-screen bg-black">
+        <div className="grid grid-cols-[minmax(260px,260px)_600px_minmax(280px,280px)] gap-0 w-full max-w-7xl">
+          {/* 左メニュー */}
+          <aside className="border-r border-zinc-800 flex flex-col sticky top-0 h-screen">
           <div className="flex-1 px-4 py-4 overflow-y-auto">
             <Link href="/" className="flex items-center gap-2 mb-8 hover:opacity-80 transition">
               <img src="/logo.png" className="w-10 h-10 rounded-full" alt="Critter" />
@@ -111,6 +112,21 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
               ))}
             </nav>
           </div>
+
+          {/* 左下アカウント表示の前に「＋クリート」ボタン */}
+          <Link
+            href="/#create-post"
+            onClick={(e) => {
+              e.preventDefault();
+              const createPostBtn = document.getElementById("open-create-post");
+              if (createPostBtn) {
+                createPostBtn.click();
+              }
+            }}
+            className="mx-4 mb-4 py-3 px-8 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-full text-center transition w-[calc(100%-2rem)]"
+          >
+            ＋ クリート
+          </Link>
 
           {/* 左下アカウント表示 */}
           <div className="border-t border-zinc-800 p-4">
@@ -183,7 +199,7 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
         </main>
 
         {/* 右サイドバー */}
-        <aside className="px-4 py-4 overflow-y-auto">
+        <aside className="px-4 py-4 overflow-y-auto border-l border-zinc-800">
           {/* 検索 */}
           <div className="mb-6">
             <input
@@ -232,6 +248,7 @@ export default function Layout({ children, currentUser, onAccountSwitch }: Layou
             </div>
           </div>
         </aside>
+        </div>
       </div>
 
       {/* モバイル レイアウト */}

@@ -51,6 +51,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [mentions, setMentions] = useState<any[]>([]);
   const [scheduledTime, setScheduledTime] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -372,6 +373,124 @@ export default function Home() {
           <PostCard key={post.id} post={post} currentUser={currentUser} onAnalytics={() => {}} />
         ))}
       </div>
+
+      {/* 隠しボタン（Layoutから呼び出し用） */}
+      <button
+        id="open-create-post"
+        onClick={() => setShowCreateModal(true)}
+        style={{ display: "none" }}
+      />
+
+      {/* 投稿フォームモーダル */}
+      {showCreateModal && (
+        <>
+          <div className="fixed inset-0 bg-black/70 z-40" onClick={() => setShowCreateModal(false)} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black border border-zinc-700 rounded-2xl w-full max-w-2xl z-50 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-black/90 backdrop-blur border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
+              <h2 className="font-bold text-xl">新しいクリート</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-zinc-500 hover:text-white text-2xl w-10 h-10 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 flex gap-4">
+              <img src={userData?.icon || "/default.png"} className="w-12 h-12 rounded-full object-cover bg-zinc-700 flex-shrink-0" />
+              <div className="flex-1">
+                <textarea
+                  value={text}
+                  onChange={handleTextChange}
+                  placeholder="いまどうしてる？"
+                  className="w-full bg-black outline-none resize-none text-xl min-h-[120px] text-white placeholder-zinc-600"
+                />
+
+                {mentions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 bg-zinc-900 border border-zinc-700 rounded-xl mt-1 max-h-40 overflow-y-auto z-10 ml-16">
+                    {mentions.map((u) => (
+                      <button
+                        key={u.uid}
+                        onClick={() => {
+                          const lastAt = text.lastIndexOf("@");
+                          const newText = text.substring(0, lastAt) + "@" + u.username + " " + text.substring(lastAt + 1);
+                          setText(newText);
+                          setMentions([]);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-sm text-white"
+                      >
+                        @{u.username} {u.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {imagePreview && (
+                  <div className="relative mt-3 inline-block">
+                    <img src={imagePreview} className="rounded-2xl max-h-[200px] object-cover" />
+                    <button
+                      onClick={() => {
+                        setImage(null);
+                        setImagePreview("");
+                      }}
+                      className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {videoPreview && (
+                  <div className="relative mt-3 inline-block">
+                    <video src={videoPreview} className="rounded-2xl max-h-[200px] object-cover" controls />
+                    <button
+                      onClick={() => {
+                        setVideo(null);
+                        setVideoPreview("");
+                      }}
+                      className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black transition text-sm"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {scheduledTime && (
+                  <div className="mt-3 p-2 bg-zinc-900 rounded-xl text-sm text-blue-400">
+                    📅 予約投稿: {new Date(scheduledTime).toLocaleString("ja-JP")}
+                  </div>
+                )}
+
+                <div className="mt-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex gap-3">
+                      <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
+                        🖼️ 画像
+                        <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                      </label>
+                      <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
+                        🎥 動画
+                        <input type="file" accept="video/*" onChange={handleVideoSelect} className="hidden" />
+                      </label>
+                      <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
+                        📅 予約
+                        <input type="datetime-local" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="hidden" />
+                      </label>
+                    </div>
+                    <button
+                      onClick={createPost}
+                      disabled={posting || (!text.trim() && !image && !video) || !currentUser?.uid}
+                      className="bg-blue-500 hover:bg-blue-600 transition px-6 py-2 rounded-full font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {posting ? "投稿中..." : "クリート"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </Layout>
   );
 }
