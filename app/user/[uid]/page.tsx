@@ -1,742 +1,432 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, ChangeEvent } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { auth, db } from "@/lib/firebase";
+
+import { auth, db, storage } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   doc,
   getDoc,
   updateDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-  arrayUnion,
-  arrayRemove,
 } from "firebase/firestore";
-import Layout from "@/components/Layout";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
 
-type ViewMode = "profile" | "followers" | "following";
-
-export default function UserPage() {
+export default function EditProfilePage() {
   const params = useParams();
+  const router = useRouter();
+
   const uid = params.uid as string;
 
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [userData, setUserData] = useState<any>(null);
 
-  const [followers, setFollowers] = useState<any[]>([]);
-  const [following, setFollowing] = useState<any[]>([]);
+  const [icon, setIcon] = useState("");
+  const [banner, setBanner] = useState("");
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [link, setLink] = useState("");
 
-  const [showMenu, setShowMenu] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("profile");
-
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [loadingList, setLoadingList] = useState(false);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      if (!uid) return;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      // 自分のプロフィールだけ編集可能
+      if (user.uid !== uid) {
+        router.push(`/user/${uid}`);
+        return;
+      }
+
+      setCurrentUser(user);
 
       try {
-        const targetSnap = await getDoc(doc(db, "users", uid));
+        const snap = await getDoc(doc(db, "users", uid));
 
-        if (targetSnap.exists()) {
-          setUserData({
-            uid,
-            ...targetSnap.data(),
-          });
+        if (!snap.exists()) {
+          alert("ユーザーが見つかりません");
+          router.push("/");
+          return;
         }
 
-        if (auth.currentUser) {
-          const meSnap = await getDoc(
-            doc(db, "users", auth.currentUser.uid)
-          );
+        const data = snap.data();
 
-          if (meSnap.exists()) {
-            const me = meSnap.data();
+        setIcon(data.icon || "");
+        setBanner(data.banner || "");
+        setName(data.name || "");
+        setUsername(data.username || "");
+        setBio(data.bio || "");
+        setLink(data.link || data.website || "");
 
-            setCurrentUser({
-              uid: auth.currentUser.uid,
-              ...me,
-            });
-
-            setIsFollowing(
-              Array.isArray(me.following) &&
-                me.following.includes(uid)
-            );
-          }
-        }
+        setLoading(false);
       } catch (error) {
-        console.error("プロフィール読み込みエラー:", error);
+        console.error(error);
+        alert("プロフィール情報の取得に失敗しました");
+        router.push(`/user/${uid}`);
       }
-    };
+    });
 
-    load();
-  }, [uid]);
+    return () => unsubscribe();
+  }, [uid, router]);
 
-  /* =========================
-     フォロワー取得
-  ========================= */
+  const handleIconChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
 
-  const loadFollowers = async () => {
-    setLoadingList(true);
+    if (!file) return;
 
-    try {
-      const q = query(
-        collection(db, "users"),
-        where("following", "array-contains", uid)
-      );
-
-      const snap = await getDocs(q);
-
-      const users = snap.docs.map((item) => ({
-        uid: item.id,
-        ...item.data(),
-      }));
-
-      setFollowers(users);
-      setViewMode("followers");
-    } catch (error) {
-      console.error("フォロワー取得エラー:", error);
-    } finally {
-      setLoadingList(false);
+    if (!file.type.startsWith("image/")) {
+      alert("画像ファイルを選択してください");
+      return;
     }
-  };
 
-  /* =========================
-     フォロー中取得
-  ========================= */
-
-  const loadFollowing = async () => {
-    setLoadingList(true);
-
-    try {
-      const targetSnap = await getDoc(
-        doc(db, "users", uid)
-      );
-
-      if (!targetSnap.exists()) {
-        setFollowing([]);
-        setViewMode("following");
-        return;
-      }
-
-      const data = targetSnap.data();
-
-      const followingIds = Array.isArray(data.following)
-        ? data.following
-        : [];
-
-      const users: any[] = [];
-
-      for (const followingUid of followingIds) {
-        try {
-          const snap = await getDoc(
-            doc(db, "users", followingUid)
-          );
-
-          if (snap.exists()) {
-            users.push({
-              uid: followingUid,
-              ...snap.data(),
-            });
-          }
-        } catch (error) {
-          console.error(error);
-        }
-      }
-
-      setFollowing(users);
-      setViewMode("following");
-    } catch (error) {
-      console.error("フォロー中取得エラー:", error);
-    } finally {
-      setLoadingList(false);
+    if (file.size > 5 * 1024 * 1024) {
+      alert("アイコンは5MB以下にしてください");
+      return;
     }
+
+    setIconFile(file);
+
+    const preview = URL.createObjectURL(file);
+    setIcon(preview);
   };
 
-  /* =========================
-     フォロー / フォロー解除
-  ========================= */
+  const handleBannerChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
 
-  const followUser = async () => {
-    if (!auth.currentUser) return;
-    if (auth.currentUser.uid === uid) return;
+    if (!file) return;
 
-    try {
-      const meRef = doc(
-        db,
-        "users",
-        auth.currentUser.uid
-      );
-
-      const targetRef = doc(
-        db,
-        "users",
-        uid
-      );
-
-      if (isFollowing) {
-        await updateDoc(meRef, {
-          following: arrayRemove(uid),
-        });
-
-        await updateDoc(targetRef, {
-          followers: arrayRemove(auth.currentUser.uid),
-        });
-
-        setIsFollowing(false);
-
-        setUserData((prev: any) => ({
-          ...prev,
-          followers: Array.isArray(prev.followers)
-            ? prev.followers.filter(
-                (id: string) =>
-                  id !== auth.currentUser?.uid
-              )
-            : [],
-        }));
-      } else {
-        await updateDoc(meRef, {
-          following: arrayUnion(uid),
-        });
-
-        await updateDoc(targetRef, {
-          followers: arrayUnion(
-            auth.currentUser.uid
-          ),
-        });
-
-        setIsFollowing(true);
-
-        setUserData((prev: any) => ({
-          ...prev,
-          followers: [
-            ...(Array.isArray(prev.followers)
-              ? prev.followers
-              : []),
-            auth.currentUser?.uid,
-          ],
-        }));
-      }
-    } catch (error) {
-      console.error(error);
-      alert("フォロー処理に失敗しました");
+    if (!file.type.startsWith("image/")) {
+      alert("画像ファイルを選択してください");
+      return;
     }
-  };
 
-  /* =========================
-     認証マーク付与
-  ========================= */
-
-  const giveVerification = async () => {
-    if (!auth.currentUser) return;
-
-    try {
-      const meSnap = await getDoc(
-        doc(db, "users", auth.currentUser.uid)
-      );
-
-      if (
-        !meSnap.exists() ||
-        meSnap.data()?.admin !== true
-      ) {
-        alert("管理者権限が必要です");
-        return;
-      }
-
-      await updateDoc(
-        doc(db, "users", uid),
-        {
-          verified: true,
-        }
-      );
-
-      setUserData((prev: any) => ({
-        ...prev,
-        verified: true,
-      }));
-
-      setShowMenu(false);
-
-      alert("認証マークを付与しました");
-    } catch (error) {
-      console.error(error);
-      alert("認証マークの付与に失敗しました");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("バナーは10MB以下にしてください");
+      return;
     }
+
+    setBannerFile(file);
+
+    const preview = URL.createObjectURL(file);
+    setBanner(preview);
   };
 
-  /* =========================
-     戻る
-  ========================= */
-
-  const goBackToProfile = () => {
-    setViewMode("profile");
-  };
-
-  /* =========================
-     ユーザー一覧
-  ========================= */
-
-  const renderUserList = (
-    users: any[],
-    title: string
+  const uploadImage = async (
+    file: File,
+    type: "icon" | "banner"
   ) => {
-    return (
-      <div className="min-h-screen bg-black text-white">
-        {/* 一覧ヘッダー */}
+    const extension =
+      file.name.split(".").pop()?.toLowerCase() || "jpg";
 
-        <div className="sticky top-0 z-30 bg-black/90 backdrop-blur border-b border-zinc-800">
-          <div className="h-16 px-4 flex items-center gap-4">
-            <button
-              onClick={goBackToProfile}
-              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition text-2xl"
-            >
-              ←
-            </button>
-
-            <div>
-              <h1 className="font-bold text-xl">
-                {title}
-              </h1>
-
-              <p className="text-xs text-zinc-500">
-                {userData?.name || "ユーザー"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* 一覧 */}
-
-        {loadingList ? (
-          <div className="py-16 text-center text-zinc-500">
-            読み込み中...
-          </div>
-        ) : users.length === 0 ? (
-          <div className="py-20 text-center text-zinc-500">
-            {title === "フォロワー"
-              ? "フォロワーはいません"
-              : "フォロー中のユーザーはいません"}
-          </div>
-        ) : (
-          <div>
-            {users.map((user) => (
-              <Link
-                key={user.uid}
-                href={`/user/${user.uid}`}
-                className="flex items-center gap-3 px-5 py-4 border-b border-zinc-800 hover:bg-zinc-900 transition"
-              >
-                <img
-                  src={user.icon || "/default.png"}
-                  className="w-12 h-12 rounded-full object-cover bg-zinc-800 shrink-0"
-                  alt=""
-                />
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1">
-                    <span className="font-bold truncate">
-                      {user.name || "ユーザー"}
-                    </span>
-
-                    {user.verified === true && (
-                      <span
-                        title="認証済み"
-                        className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0"
-                      >
-                        ✓
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="text-sm text-zinc-500 truncate">
-                    @{user.username || "user"}
-                  </div>
-
-                  {user.bio && (
-                    <div className="text-sm text-zinc-400 mt-1 truncate">
-                      {user.bio}
-                    </div>
-                  )}
-                </div>
-
-                {auth.currentUser?.uid !==
-                  user.uid && (
-                  <span className="border border-zinc-600 rounded-full px-4 py-1.5 text-sm font-bold shrink-0">
-                    プロフィール
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+    const fileRef = ref(
+      storage,
+      `users/${uid}/${type}_${Date.now()}.${extension}`
     );
+
+    await uploadBytes(fileRef, file);
+
+    return await getDownloadURL(fileRef);
   };
 
-  /* =========================
-     読み込み中
-  ========================= */
+  const saveProfile = async () => {
+    if (!currentUser) return;
 
-  if (!userData) {
+    if (!name.trim()) {
+      alert("表示名を入力してください");
+      return;
+    }
+
+    if (!username.trim()) {
+      alert("ユーザー名を入力してください");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      let newIcon = icon;
+      let newBanner = banner;
+
+      // アイコンアップロード
+      if (iconFile) {
+        newIcon = await uploadImage(iconFile, "icon");
+      }
+
+      // バナーアップロード
+      if (bannerFile) {
+        newBanner = await uploadImage(bannerFile, "banner");
+      }
+
+      await updateDoc(doc(db, "users", uid), {
+        name: name.trim(),
+        username: username.trim().replace(/^@/, ""),
+        bio: bio.trim(),
+        link: link.trim(),
+        icon: newIcon,
+        banner: newBanner,
+      });
+
+      alert("プロフィールを更新しました");
+
+      router.push(`/user/${uid}`);
+      router.refresh();
+    } catch (error) {
+      console.error("Profile update error:", error);
+      alert("プロフィールの更新に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
     return (
-      <Layout currentUser={currentUser}>
-        <div className="p-6 text-white">
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-zinc-400">
           読み込み中...
         </div>
-      </Layout>
+      </div>
     );
   }
-
-  const followerCount = Array.isArray(
-    userData.followers
-  )
-    ? userData.followers.length
-    : 0;
-
-  const followingCount = Array.isArray(
-    userData.following
-  )
-    ? userData.following.length
-    : 0;
-
-  /* =========================
-     フォロワー / フォロー中画面
-  ========================= */
-
-  if (viewMode === "followers") {
-    return (
-      <Layout currentUser={currentUser}>
-        {renderUserList(
-          followers,
-          "フォロワー"
-        )}
-      </Layout>
-    );
-  }
-
-  if (viewMode === "following") {
-    return (
-      <Layout currentUser={currentUser}>
-        {renderUserList(
-          following,
-          "フォロー中"
-        )}
-      </Layout>
-    );
-  }
-
-  /* =========================
-     プロフィール画面
-  ========================= */
 
   return (
-    <Layout currentUser={currentUser}>
-      <div className="text-white min-h-screen bg-black">
+    <div className="min-h-screen bg-black text-white">
 
-        {/* =========================
-            プロフィール上部
-        ========================= */}
+      {/* ヘッダー */}
+      <header className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-800">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
 
-        <div className="sticky top-0 z-30 bg-black/90 backdrop-blur border-b border-zinc-800">
-          <div className="h-16 px-4 flex items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="w-10 h-10 rounded-full hover:bg-zinc-900 flex items-center justify-center text-xl transition"
+          >
+            ←
+          </button>
 
-            <Link
-              href="/"
-              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition text-2xl"
-            >
-              ←
-            </Link>
-
-            <div className="min-w-0">
-              <h1 className="font-bold text-xl truncate">
-                {userData.name || "ユーザー"}
-                {userData.verified === true && (
-                  <span className="inline-flex ml-1 align-middle w-5 h-5 rounded-full bg-blue-500 text-white items-center justify-center text-xs font-bold">
-                    ✓
-                  </span>
-                )}
-              </h1>
-
-              <p className="text-xs text-zinc-500">
-                {userData.postsCount ??
-                  userData.postCount ??
-                  0}{" "}
-                件のクリート
-              </p>
-            </div>
-
-            {/* 右上メニュー */}
-
-            <div className="ml-auto relative">
-
-              <button
-                onClick={() =>
-                  setShowMenu(!showMenu)
-                }
-                className="w-10 h-10 rounded-full hover:bg-zinc-900 flex items-center justify-center text-2xl"
-              >
-                ⋯
-              </button>
-
-              {showMenu && (
-                <div className="absolute right-0 top-12 w-60 bg-black border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50">
-
-                  <button
-                    onClick={giveVerification}
-                    className="w-full text-left px-4 py-3 hover:bg-zinc-900 transition"
-                  >
-                    ☑️ 認証マークを付与
-                  </button>
-
-                </div>
-              )}
-            </div>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold">
+              プロフィールを編集
+            </h1>
           </div>
+
+          <button
+            onClick={saveProfile}
+            disabled={saving}
+            className={`px-5 py-2 rounded-full font-bold transition ${
+              saving
+                ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
+                : "bg-white text-black hover:bg-zinc-200"
+            }`}
+          >
+            {saving ? "保存中..." : "保存"}
+          </button>
+
         </div>
+      </header>
 
-        {/* =========================
-            ヘッダー画像
-        ========================= */}
+      <main className="max-w-2xl mx-auto pb-20">
 
+        {/* バナー */}
         <div className="relative">
 
-          <div className="w-full aspect-[3/1] bg-zinc-900 overflow-hidden">
-            {userData.banner ? (
+          <div className="w-full h-48 bg-zinc-800 overflow-hidden">
+            {banner ? (
               <img
-                src={userData.banner}
+                src={banner}
+                alt="バナー"
                 className="w-full h-full object-cover"
-                alt=""
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-sky-300 via-blue-300 to-blue-500 flex items-center justify-center">
-                <span className="text-white/80 text-3xl font-bold">
-                  {userData.name || "Critter"}
+              <div className="w-full h-full bg-gradient-to-r from-blue-400 to-blue-600" />
+            )}
+          </div>
+
+          <label
+            htmlFor="banner-upload"
+            className="absolute inset-0 flex items-center justify-center cursor-pointer group"
+          >
+            <div className="bg-black/60 rounded-full w-14 h-14 flex items-center justify-center text-2xl opacity-80 group-hover:opacity-100 transition">
+              📷
+            </div>
+          </label>
+
+          <input
+            id="banner-upload"
+            type="file"
+            accept="image/*"
+            onChange={handleBannerChange}
+            className="hidden"
+          />
+
+          {/* アイコン */}
+          <div className="absolute left-5 -bottom-16">
+
+            <label
+              htmlFor="icon-upload"
+              className="block relative w-32 h-32 rounded-full cursor-pointer group"
+            >
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-black bg-zinc-800">
+
+                {icon ? (
+                  <img
+                    src={icon}
+                    alt="アイコン"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src="/default.png"
+                    alt="アイコン"
+                    className="w-full h-full object-cover"
+                  />
+                )}
+
+              </div>
+
+              <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                <span className="text-2xl">
+                  📷
                 </span>
               </div>
-            )}
+            </label>
+
+            <input
+              id="icon-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleIconChange}
+              className="hidden"
+            />
+
           </div>
 
-          {/* =========================
-              アイコン
-          ========================= */}
-
-          <div className="absolute left-4 -bottom-14">
-            <div className="w-28 h-28 rounded-full bg-black p-1">
-              <img
-                src={userData.icon || "/default.png"}
-                className="w-full h-full rounded-full object-cover bg-zinc-800"
-                alt=""
-              />
-            </div>
-          </div>
         </div>
 
-        {/* =========================
-            プロフィール情報
-        ========================= */}
+        <div className="px-5 pt-24">
 
-        <div className="px-4 pt-16 pb-5 border-b border-zinc-800">
+          {/* 表示名 */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-zinc-300 mb-2">
+              表示名
+            </label>
 
-          {/* プロフィール編集 / フォロー */}
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={50}
+              placeholder="表示名"
+              className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition"
+            />
 
-          <div className="flex justify-end mb-4">
-
-            {auth.currentUser?.uid === uid ? (
-              <button
-                onClick={() =>
-                  (location.href = "/settings")
-                }
-                className="border border-zinc-600 hover:bg-zinc-900 px-5 py-2 rounded-full font-bold transition"
-              >
-                プロフィールを編集
-              </button>
-            ) : (
-              <button
-                onClick={followUser}
-                className={`px-6 py-2 rounded-full font-bold transition ${
-                  isFollowing
-                    ? "bg-transparent border border-zinc-600 text-white hover:bg-red-500/10 hover:text-red-400 hover:border-red-400"
-                    : "bg-white text-black hover:bg-zinc-200"
-                }`}
-              >
-                {isFollowing
-                  ? "フォロー中"
-                  : "フォロー"}
-              </button>
-            )}
-
-          </div>
-
-          {/* 名前 */}
-
-          <div className="flex items-center gap-1">
-            <h2 className="text-2xl font-bold">
-              {userData.name || "ユーザー"}
-            </h2>
-
-            {userData.verified === true && (
-              <span
-                title="認証済み"
-                className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold"
-              >
-                ✓
-              </span>
-            )}
+            <div className="text-right text-xs text-zinc-500 mt-1">
+              {name.length}/50
+            </div>
           </div>
 
           {/* ユーザー名 */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-zinc-300 mb-2">
+              ユーザー名
+            </label>
 
-          <p className="text-zinc-500 mt-1">
-            @{userData.username || "user"}
-          </p>
+            <div className="flex items-center bg-black border border-zinc-700 rounded-xl overflow-hidden focus-within:border-blue-500 transition">
+              <span className="pl-4 text-zinc-500">
+                @
+              </span>
+
+              <input
+                type="text"
+                value={username}
+                onChange={(e) =>
+                  setUsername(
+                    e.target.value
+                      .replace(/^@/, "")
+                      .replace(/\s/g, "")
+                  )
+                }
+                maxLength={30}
+                placeholder="username"
+                className="flex-1 bg-transparent px-2 py-3 outline-none"
+              />
+            </div>
+          </div>
 
           {/* 自己紹介 */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-zinc-300 mb-2">
+              自己紹介
+            </label>
 
-          {userData.bio && (
-            <p className="mt-4 whitespace-pre-wrap leading-relaxed">
-              {userData.bio}
-            </p>
-          )}
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              maxLength={160}
+              rows={5}
+              placeholder="自己紹介を入力してください"
+              className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition resize-none"
+            />
 
-          {/* プロフィール詳細 */}
-
-          <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 text-sm text-zinc-500">
-
-            {userData.website && (
-              <a
-                href={userData.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:underline"
-              >
-                🔗 {userData.website}
-              </a>
-            )}
-
-            {userData.birthday && (
-              <span>
-                🎂 {userData.birthday}
-              </span>
-            )}
-
-            {userData.createdAt && (
-              <span>
-                📅 Critterに参加
-              </span>
-            )}
-
-          </div>
-
-          {/* =========================
-              フォロー数
-          ========================= */}
-
-          <div className="flex gap-6 mt-5">
-
-            <button
-              onClick={loadFollowing}
-              className="hover:underline"
-            >
-              <span className="font-bold">
-                {followingCount}
-              </span>{" "}
-              <span className="text-zinc-500">
-                フォロー中
-              </span>
-            </button>
-
-            <button
-              onClick={loadFollowers}
-              className="hover:underline"
-            >
-              <span className="font-bold">
-                {followerCount}
-              </span>{" "}
-              <span className="text-zinc-500">
-                フォロワー
-              </span>
-            </button>
-
-          </div>
-        </div>
-
-        {/* =========================
-            認証案内
-        ========================= */}
-
-        {userData.verified !== true &&
-          auth.currentUser?.uid === uid && (
-            <div className="mx-4 my-4 bg-green-950 border border-green-900 rounded-2xl p-5">
-
-              <div className="flex items-start justify-between gap-3">
-
-                <div>
-                  <div className="text-xl font-bold text-green-200">
-                    まだ認証されていません ✓
-                  </div>
-
-                  <p className="text-sm text-green-300 mt-2 leading-relaxed">
-                    認証を受けると、返信の強化、アナリティクス、
-                    広告のないブラウジングなどを利用できます。
-                  </p>
-
-                  <button
-                    onClick={() =>
-                      alert(
-                        "認証機能は現在準備中です"
-                      )
-                    }
-                    className="mt-4 bg-white text-black px-5 py-2 rounded-full font-bold hover:bg-zinc-200"
-                  >
-                    認証される
-                  </button>
-                </div>
-
-                <button className="text-green-300 text-xl">
-                  ×
-                </button>
-
-              </div>
+            <div className="text-right text-xs text-zinc-500 mt-1">
+              {bio.length}/160
             </div>
-          )}
+          </div>
 
-        {/* =========================
-            投稿タブ
-        ========================= */}
+          {/* リンク */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-zinc-300 mb-2">
+              リンク
+            </label>
 
-        <div className="grid grid-cols-4 border-b border-zinc-800">
+            <input
+              type="url"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://example.com"
+              className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition"
+            />
 
-          <button className="relative py-4 text-sm font-bold hover:bg-zinc-900">
-            ポスト
-            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-blue-500 rounded-full" />
+            <p className="text-xs text-zinc-500 mt-2">
+              YouTubeやSNSなどのリンクを設定できます。
+            </p>
+          </div>
+
+          {/* 保存ボタン */}
+          <button
+            onClick={saveProfile}
+            disabled={saving}
+            className={`w-full py-4 rounded-xl font-bold text-lg transition ${
+              saving
+                ? "bg-zinc-700 text-zinc-400"
+                : "bg-blue-500 hover:bg-blue-600 text-white"
+            }`}
+          >
+            {saving ? "保存中..." : "プロフィールを保存"}
           </button>
 
-          <button className="py-4 text-sm text-zinc-500 hover:bg-zinc-900">
-            返信
-          </button>
-
-          <button className="py-4 text-sm text-zinc-500 hover:bg-zinc-900">
-            リポスト
-          </button>
-
-          <button className="py-4 text-sm text-zinc-500 hover:bg-zinc-900">
-            メディア
+          {/* キャンセル */}
+          <button
+            onClick={() => router.back()}
+            disabled={saving}
+            className="w-full mt-3 py-4 rounded-xl border border-zinc-700 hover:bg-zinc-900 transition font-bold"
+          >
+            キャンセル
           </button>
 
         </div>
-
-        {/* =========================
-            投稿エリア
-        ========================= */}
-
-        <div className="px-6 py-8 text-center text-zinc-500">
-          このユーザーのクリートがここに表示されます。
-        </div>
-
-      </div>
-    </Layout>
+      </main>
+    </div>
   );
 }
