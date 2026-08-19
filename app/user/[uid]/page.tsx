@@ -69,7 +69,9 @@ export default function ProfilePage() {
           where("following", "array-contains", uid)
         );
 
-        const followerSnap = await getDocs(followerQuery);
+        const followerSnap = await getDocs(
+          followerQuery
+        );
 
         setFollowers(
           followerSnap.docs.map((d) => ({
@@ -84,7 +86,7 @@ export default function ProfilePage() {
         if (followingIds.length > 0) {
           const results: any[] = [];
 
-          // Firestoreのwhere in制限を避けるため分割
+          // Firestoreのwhere in制限を避けるため10件ずつ取得
           for (let i = 0; i < followingIds.length; i += 10) {
             const chunk = followingIds.slice(i, i + 10);
 
@@ -121,7 +123,9 @@ export default function ProfilePage() {
   }, [uid]);
 
   const followUser = async () => {
-    if (!currentUser || currentUser.uid === uid) return;
+    if (!currentUser || currentUser.uid === uid) {
+      return;
+    }
 
     try {
       const currentRef = doc(
@@ -139,7 +143,10 @@ export default function ProfilePage() {
       const currentSnap = await getDoc(currentRef);
       const targetSnap = await getDoc(targetRef);
 
-      if (!currentSnap.exists() || !targetSnap.exists()) {
+      if (
+        !currentSnap.exists() ||
+        !targetSnap.exists()
+      ) {
         return;
       }
 
@@ -161,7 +168,8 @@ export default function ProfilePage() {
 
         await updateDoc(targetRef, {
           followers: targetFollowers.filter(
-            (id: string) => id !== currentUser.uid
+            (id: string) =>
+              id !== currentUser.uid
           ),
         });
 
@@ -184,7 +192,7 @@ export default function ProfilePage() {
         setIsFollowing(true);
       }
 
-      // 再取得
+      // フォロワー一覧を再取得
       const followerQuery = query(
         collection(db, "users"),
         where(
@@ -208,10 +216,12 @@ export default function ProfilePage() {
         "Follow error:",
         error
       );
+
       alert("フォロー処理に失敗しました");
     }
   };
 
+  // 青色の認証マークを付与
   const grantVerification = async () => {
     if (!currentUser) return;
 
@@ -233,10 +243,42 @@ export default function ProfilePage() {
       alert("認証マークを付与しました");
     } catch (error) {
       console.error(error);
+
       alert(
         "認証マークの付与に失敗しました"
       );
     }
+  };
+
+  // 認証マーク
+  const VerificationMark = ({
+    user,
+  }: {
+    user: any;
+  }) => {
+    if (user?.admin === true) {
+      return (
+        <img
+          src="/verified-gold.png"
+          alt="管理者認証"
+          title="管理者"
+          className="w-5 h-5 object-contain shrink-0"
+        />
+      );
+    }
+
+    if (user?.verified === true) {
+      return (
+        <img
+          src="/verified-blue.png"
+          alt="認証済み"
+          title="認証済み"
+          className="w-5 h-5 object-contain shrink-0"
+        />
+      );
+    }
+
+    return null;
   };
 
   if (loading) {
@@ -268,18 +310,14 @@ export default function ProfilePage() {
         currentUser
           ? {
               ...currentUser,
-              ...(
-                currentUser
-                  ? {}
-                  : {}
-              ),
+              ...userData,
             }
           : null
       }
     >
       <div className="min-h-screen bg-black text-white">
 
-        {/* プロフィール上部 */}
+        {/* プロフィール */}
         <div className="border-b border-zinc-800">
 
           {/* バナー */}
@@ -313,7 +351,7 @@ export default function ProfilePage() {
               />
             </div>
 
-            {/* 上部ボタン */}
+            {/* ボタン */}
             <div className="flex justify-end -mt-16 mb-5 relative">
 
               {isOwnProfile ? (
@@ -357,7 +395,14 @@ export default function ProfilePage() {
                       onClick={grantVerification}
                       className="w-full text-left px-4 py-3 hover:bg-zinc-900 text-sm"
                     >
-                      ☑️ 認証マークを付与
+                      <span className="flex items-center gap-2">
+                        <img
+                          src="/verified-blue.png"
+                          alt=""
+                          className="w-5 h-5 object-contain"
+                        />
+                        認証マークを付与
+                      </span>
                     </button>
 
                   </div>
@@ -376,14 +421,9 @@ export default function ProfilePage() {
                     "ユーザー"}
                 </h1>
 
-                {userData.verified === true && (
-                  <span
-                    className="text-blue-500 text-xl"
-                    title="認証済み"
-                  >
-                    ✓
-                  </span>
-                )}
+                <VerificationMark
+                  user={userData}
+                />
 
               </div>
 
@@ -451,14 +491,16 @@ export default function ProfilePage() {
               </button>
 
             </div>
+
           </div>
         </div>
 
-        {/* フォロー一覧 */}
+        {/* フォロワー・フォロー中 */}
         {(showFollowers ||
           showFollowing) && (
           <div className="border-b border-zinc-800">
 
+            {/* タブ */}
             <div className="flex border-b border-zinc-800">
 
               <button
@@ -491,6 +533,7 @@ export default function ProfilePage() {
 
             </div>
 
+            {/* ユーザー一覧 */}
             <div>
 
               {(showFollowers
@@ -530,12 +573,9 @@ export default function ProfilePage() {
                             "ユーザー"}
                         </span>
 
-                        {user.verified ===
-                          true && (
-                          <span className="text-blue-500 font-bold">
-                            ✓
-                          </span>
-                        )}
+                        <VerificationMark
+                          user={user}
+                        />
 
                       </div>
 
@@ -554,13 +594,13 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* 投稿部分 */}
+        {/* 投稿 */}
         {!showFollowers &&
           !showFollowing && (
-            <div className="py-16 text-center text-zinc-500">
-              ここにユーザーのクリートが表示されます
-            </div>
-          )}
+          <div className="py-16 text-center text-zinc-500">
+            ここにユーザーのクリートが表示されます
+          </div>
+        )}
 
       </div>
     </Layout>
