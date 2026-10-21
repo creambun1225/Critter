@@ -20,6 +20,7 @@ export default function Signup() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // メールアドレスで登録
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -73,6 +74,7 @@ export default function Signup() {
     }
   };
 
+  // Googleで登録
   const handleGoogleSignup = async () => {
     setLoading(true);
     setError("");
@@ -118,6 +120,7 @@ export default function Signup() {
     }
   };
 
+  // Xで登録
   const handleXSignup = async () => {
     setLoading(true);
     setError("");
@@ -172,26 +175,22 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="text-5xl mb-4">🐦</div>
-          <h1 className="text-3xl font-bold mb-2">Critter</h1>
-          <p className="text-zinc-400">Critterに登録</p>
-        </div>
+      <div className="w-full max-w-xs">
+        <h1 className="text-4xl font-bold text-center mb-10">Critter</h1>
 
-        <form onSubmit={handleEmailSignup} className="space-y-4 mb-6">
-          {error && (
-            <div className="bg-red-900/30 border border-red-700 text-red-200 px-4 py-2 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+        {error && (
+          <div className="bg-red-900/30 border border-red-700 text-red-200 px-4 py-2 rounded-2xl text-sm mb-4">
+            {error}
+          </div>
+        )}
 
+        <form onSubmit={handleEmailSignup} className="space-y-3">
           <input
             type="text"
             placeholder="お名前"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 outline-none focus:border-blue-500 transition"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-full px-5 py-3 text-white placeholder-zinc-500 outline-none focus:border-blue-500 transition"
           />
 
           <input
@@ -199,7 +198,7 @@ export default function Signup() {
             placeholder="ユーザー名（@の後ろ）"
             value={username}
             onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 outline-none focus:border-blue-500 transition"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-full px-5 py-3 text-white placeholder-zinc-500 outline-none focus:border-blue-500 transition"
           />
 
           <input
@@ -207,7 +206,7 @@ export default function Signup() {
             placeholder="メールアドレス"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 outline-none focus:border-blue-500 transition"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-full px-5 py-3 text-white placeholder-zinc-500 outline-none focus:border-blue-500 transition"
           />
 
           <input
@@ -215,33 +214,33 @@ export default function Signup() {
             placeholder="パスワード（6文字以上）"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 outline-none focus:border-blue-500 transition"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-full px-5 py-3 text-white placeholder-zinc-500 outline-none focus:border-blue-500 transition"
           />
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-3 rounded-lg transition"
+            className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-3 rounded-full transition"
           >
             {loading ? "登録中..." : "登録"}
           </button>
         </form>
 
-        <div className="mb-6">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-zinc-700"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-black text-zinc-400">または</span>
-            </div>
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-zinc-700"></div>
           </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-black text-zinc-400">または</span>
+          </div>
+        </div>
 
+        <div className="space-y-3">
           <button
             type="button"
             onClick={handleGoogleSignup}
             disabled={loading}
-            className="w-full bg-white hover:bg-zinc-100 disabled:opacity-50 text-black font-bold py-3 rounded-lg transition flex items-center justify-center gap-2"
+            className="w-full bg-white hover:bg-zinc-100 disabled:opacity-50 text-black font-bold py-3 rounded-full transition flex items-center justify-center gap-2"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -256,16 +255,15 @@ export default function Signup() {
             type="button"
             onClick={handleXSignup}
             disabled={loading}
-            className="w-full mt-3 bg-black border border-zinc-600 hover:bg-zinc-900 disabled:opacity-50 text-white font-bold py-3 rounded-lg transition"
+            className="w-full bg-white hover:bg-zinc-100 disabled:opacity-50 text-black font-bold py-3 rounded-full transition"
           >
             Xで登録
           </button>
         </div>
 
-        <p className="text-center text-zinc-400">
-          既にアカウントをお持ち？{" "}
-          <Link href="/login" className="text-blue-500 hover:text-blue-400 transition">
-            ログイン
+        <p className="text-center mt-6">
+          <Link href="/login" className="text-blue-500 hover:text-blue-400 font-bold transition">
+            ログインはこちら
           </Link>
         </p>
       </div>
