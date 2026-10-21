@@ -155,8 +155,8 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-3xl p-8">
-        <h1 className="text-4xl font-bold text-white text-center mb-8">Critter</h1>
+      <div className="w-full max-w-xs">
+        <h1 className="text-4xl font-bold text-white text-center mb-10">Critter</h1>
 
         {error && (
           <div className="bg-red-900/30 border border-red-700 text-red-200 px-4 py-2 rounded-2xl text-sm mb-4">
@@ -164,7 +164,7 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleEmailLogin} className="space-y-4">
+        <form onSubmit={handleEmailLogin} className="space-y-3">
           <input
             type="email"
             placeholder="メールアドレス"
@@ -195,7 +195,7 @@ export default function Login() {
             <div className="w-full border-t border-zinc-700"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-zinc-950 text-zinc-400">または</span>
+            <span className="px-2 bg-black text-zinc-400">または</span>
           </div>
         </div>
 
@@ -219,7 +219,7 @@ export default function Login() {
             type="button"
             onClick={handleXLogin}
             disabled={loading}
-            className="w-full bg-black border border-zinc-600 hover:bg-zinc-900 disabled:opacity-50 text-white font-bold py-3 rounded-full transition"
+            className="w-full bg-white hover:bg-zinc-100 disabled:opacity-50 text-black font-bold py-3 rounded-full transition"
           >
             Xでログイン
           </button>
