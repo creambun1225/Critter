@@ -333,22 +333,22 @@ export default function Home() {
           )}
           {scheduledTime && (
             <div className="mt-3 p-2 bg-zinc-900 rounded-xl text-sm text-blue-400">
-              📅 予約投稿: {new Date(scheduledTime).toLocaleString("ja-JP")}
+              予約投稿: {new Date(scheduledTime).toLocaleString("ja-JP")}
             </div>
           )}
           <div className="mt-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex gap-3">
                 <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
-                  🖼️ 画像
+                  画像
                   <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
                 </label>
                 <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
-                  🎥 動画
+                  動画
                   <input type="file" accept="video/*" onChange={handleVideoSelect} className="hidden" />
                 </label>
                 <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
-                  📅 予約
+                  予約
                   <input type="datetime-local" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="hidden" />
                 </label>
               </div>
@@ -457,7 +457,7 @@ export default function Home() {
 
                 {scheduledTime && (
                   <div className="mt-3 p-2 bg-zinc-900 rounded-xl text-sm text-blue-400">
-                    📅 予約投稿: {new Date(scheduledTime).toLocaleString("ja-JP")}
+                    予約投稿: {new Date(scheduledTime).toLocaleString("ja-JP")}
                   </div>
                 )}
 
@@ -465,15 +465,15 @@ export default function Home() {
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex gap-3">
                       <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
-                        🖼️ 画像
+                        画像
                         <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
                       </label>
                       <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
-                        🎥 動画
+                        動画
                         <input type="file" accept="video/*" onChange={handleVideoSelect} className="hidden" />
                       </label>
                       <label className="cursor-pointer bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition px-3 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">
-                        📅 予約
+                        予約
                         <input type="datetime-local" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="hidden" />
                       </label>
                     </div>
